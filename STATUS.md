@@ -306,19 +306,38 @@ is on disk.
 **Blocking publication only** — short tasks, but v0.1 cannot be tagged with any outstanding:
 
 - **B3** Resolve the Kars possible-duplicate and the Toprakkale province assignment.
-- **B4** Verify the İBBS-2 mapping against TÜİK's official classification. The table in
-  `02_build_facilities.R` carries a `>>> VERIFY BEFORE PUBLICATION <<<` marker.
-- **B5** Determine which years are observed versus nowcast. **The premise recorded here
-  was wrong and the task is harder than it looked.** The PDF was read on 2026-09-01: it
-  documents every column and the licence, says the models give "our current best
-  estimates", and **draws no line between measured and nowcast years**. The confidence
-  files were then extracted as the obvious fallback and they do not vary by period either
-  — Turkish cement `emissions_quantity` is "low" for 9 facilities and "medium" for 49 in
-  2021 and 2026 alike, so it is a per-facility property with no temporal signal. Nothing
-  in the shipped package marks the boundary. The panel therefore follows §5's instruction
-  (`LAST_OBSERVED_YEAR <- 2024`, stated once in `03_build_panel.R`), and the remaining
-  work is the upstream changelog and the sector methodology documents, which are online
-  and were not consulted.
+- ~~**B4**~~ **CLOSED 2026-09-06, and it was already correct.** All 81 provinces were
+  compared programmatically against the official İBBS Düzey 3 list (Bakanlar Kurulu Kararı
+  2002/4720, Resmî Gazete 22.09.2002); **every one carries the official Düzey 2 code**, 26
+  regions on both sides, no misassignment, no gap. One spelling variant with no effect:
+  province 30 is written `Hakkâri` here and `Hakkari` in the reference, same code, and no
+  facility sits there. The `VERIFY BEFORE PUBLICATION` marker is gone and the source and
+  date are in the script.
+- ~~**B5**~~ **ANSWERED 2026-09-06: the boundary does not exist.** Three sources checked —
+  `about_the_data.pdf`, the confidence files, and the v5.10.0 changelog. Climate TRACE is
+  a modelled inventory throughout; there is no "measured until 2024, estimated after".
+  The changelog proves it rather than merely failing to contradict it: where a year really
+  is predicted it says so ("the 2026 production data were predicted using a regression-based
+  approach", agriculture), and **no such sentence exists for electricity generation, iron
+  and steel, cement or coal mining** — those read "full refresh… from 2021 to Jun 2026".
+  So `LAST_OBSERVED_YEAR <- 2024` is an instruction with no evidence behind it. It is left
+  unchanged on purpose: whether to keep it, move it, or replace the observed/projected
+  vocabulary is **the author's methodological call**, and it is a one-line edit in
+  `03_build_panel.R`. See FINDINGS A7.
+
+**Two things B5 turned up on the way, both in the same changelog:**
+
+- **Climate TRACE ingests EPİAŞ.** The v5.10.0 power section lists `TUR – Epias
+  Transparency Platform (EPIAS)` among newly ensembled reported-activity sources. This
+  project closed EPİAŞ as a dead end in its first week — correctly, for *direct* use — but
+  the data has been reaching us through Climate TRACE all along. It is also the obvious
+  candidate for A5's 12.4% generation revision, since that is the release which added it.
+  A hypothesis, not a demonstration: several other power changes landed together.
+- **A zero may mean "not running".** Changelog known issue: *"For non-operational plants
+  the data is reported as zero values for capacity, capacity factor, activity, emissions
+  intensity, and emissions."* The panel averages monthly capacity (B2), so a plant idle for
+  six months carries half its real capacity, and the panel does not currently separate
+  "idle" from "operating at zero". Not yet handled. See FINDINGS A8.
 - **B8** Find the citation for the €75 / €150 scenarios. They currently sit in
   `carbon_price_scenarios.json` with `citation_required: true` and `source_url: null` —
   §7 forbids using a regulatory number without a citation, so the project currently

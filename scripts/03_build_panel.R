@@ -82,8 +82,8 @@ if (!file.exists(FACILITIES)) {
 # observed year enter the panel as `value_type = projected`, drawn dashed and
 # badged, never rendered as an observation. It names 2025-2026 as those years.
 #
-# THE EVIDENCE FOR THIS BOUNDARY WAS LOOKED FOR AND NOT FOUND (2026-09-01).
-# Two sources were checked and neither settles it:
+# B5 IS NOW ANSWERED, AND THE ANSWER IS THAT THE BOUNDARY DOES NOT EXIST.
+# Three sources were checked (2026-09-01 and 2026-09-06):
 #
 #   about_the_data.pdf     Describes every column and the licence, and says the
 #                          models "provide our current best estimates". It draws
@@ -91,13 +91,29 @@ if (!file.exists(FACILITIES)) {
 #   the confidence files   Published per period, but the ratings do not vary by
 #                          period. Turkish cement emissions_quantity is "low"
 #                          for 9 facilities and "medium" for 49 in 2021 and in
-#                          2026 alike. It is a per-facility property replicated
-#                          across months, so it carries no temporal signal.
+#                          2026 alike — a per-facility property with no temporal
+#                          signal.
+#   the v5.10.0 changelog  Extends the data period month by month and says
+#                          nothing about nowcasting for our four sectors.
 #
-# So the boundary is an instruction, not a measurement. It is therefore stated
-# ONCE, here, where it can be revised in one edit when the sector methodology
-# documents or the upstream changelog settle it. Do not scatter this year
-# number through the codebase. See ROADMAP B5.
+# Climate TRACE is a modelled inventory throughout. Not "2021-2024 measured,
+# 2025-2026 estimated" — every figure is a model estimate, and the provider
+# never claims otherwise.
+#
+# The changelog PROVES this rather than merely failing to contradict it: where a
+# year really is predicted, it says so. For agriculture, "the 2026 production
+# data were predicted using a regression-based approach". No such sentence
+# exists for electricity generation, iron and steel, cement or coal mining;
+# those read "full refresh of asset-level emissions from 2021 to Jun 2026" and
+# "added new month, June 2026". The provider distinguishes predicted years where
+# it makes one, and does not make one here.
+#
+# SO THIS CONSTANT IS AN INSTRUCTION WITH NO EVIDENCE BEHIND IT. §5 names
+# 2025-2026 as projected; nothing in the source supports singling out 2025.
+# It is left unchanged deliberately: choosing between keeping the conservative
+# setting, moving it, and replacing the observed/projected vocabulary with one
+# this source can bear is a methodological decision reserved to the author (§9).
+# Stated once, here, so that decision is a one-line edit. See FINDINGS A7.
 LAST_OBSERVED_YEAR <- 2024
 
 # t0, established empirically by 00_coverage_audit.R rather than assumed.

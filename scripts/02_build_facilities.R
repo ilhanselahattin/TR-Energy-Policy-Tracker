@@ -124,12 +124,21 @@ BOUNDARY_PROXIMITY_M <- 2000
 # NUTS-2 assignments follow TÜİK's İstatistiki Bölge Birimleri Sınıflandırması
 # (İBBS) Level 2: 26 regions over 81 provinces.
 #
-#   >>> VERIFY BEFORE PUBLICATION <<<
-#   This mapping is transcribed, not fetched from an authoritative file. Before
-#   any figure keyed on nuts2_code is published, check it against TÜİK's
-#   official İBBS classification and record the source URL and retrieval date in
-#   data/processed/SOURCES.md. A classification without a citation is not usable
-#   in this project (§7).
+#   VERIFIED 2026-09-06 (ROADMAP B4). Every one of the 81 provinces was compared
+#   against the official İBBS Düzey 3 list, whose first four characters are the
+#   Düzey 2 code, and ALL 81 MATCH — no misassignment, no missing region, 26
+#   regions on both sides.
+#
+#   Legal basis: Bakanlar Kurulu Kararı 2002/4720, Resmî Gazete 22.09.2002,
+#   which established the three-tier classification. The comparison used the
+#   İBBS table published at
+#   https://erenler.meb.gov.tr/meb_iys_dosyalar/2018_03/26110153_Ek1.2-IBBS_Ystatistiki_BYlge_Birimleri_SYnYflamasY.pdf
+#
+#   One spelling variant, and it changes nothing: this table writes province 30
+#   as "Hakkâri" and the reference writes "Hakkari". Both are current Turkish
+#   usage, the NUTS-2 code is identical, and no facility in the register sits
+#   there — so the display name is a choice, not a defect. Left as-is rather
+#   than changed silently.
 #
 # Format: "plate|Turkish name|NUTS-2 code"
 TR_PROVINCE_RAW <- c(
