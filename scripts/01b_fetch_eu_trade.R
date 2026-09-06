@@ -76,6 +76,21 @@ if (!identical(policy$meta$scope_status, "annex_i_verified")) {
           "They OVERSTATE CBAM scope, so every share derived here is an UPPER BOUND.\n",
           "Do not publish any figure from this run.\n",
           strrep("!", 70), "\n", immediate. = TRUE)
+
+} else if (!isTRUE(policy$meta$exclusions_applied_in_query)) {
+  # Verifying the list against Annex I and applying it are different jobs, and
+  # the first must not silence the warning that belongs to the second. Chapter
+  # 72 is still requested whole here while Annex I carves out the ferro-alloys
+  # and 7204 scrap; chapter 76 likewise keeps 7602 and 7615. The overstatement
+  # is unchanged — the only difference is that it is now written down.
+  warning("\n",
+          strrep("!", 70), "\n",
+          "cbam_goods_cn_codes.json: code list matches Annex I, but this script\n",
+          "does NOT subtract meta exclusions. Steel and aluminium shares are\n",
+          "still UPPER BOUNDS. Cement is exact — Annex I lists all five 2523\n",
+          "subheadings, so nothing is carved out of it.\n",
+          "To fix: query at CN8 and sum only the included codes.\n",
+          strrep("!", 70), "\n", immediate. = TRUE)
 }
 
 COMEXT_URL <- policy$meta$trade_source$endpoint
@@ -278,9 +293,24 @@ diagnostic <- trade_sector_year |>
   mutate(
     naive_ratio = eu_import_t / production_t,
     value_type  = "diagnostic_not_for_use",
-    caveat      = paste(
-      "Numerator is finished-goods trade under PROVISIONAL aggregate customs",
-      "codes; denominator is crude production. Not a valid export share."
+    # The caveat states the CURRENT state of the codes rather than a fixed
+    # string, so it cannot go stale the way the previous one did: it said
+    # "PROVISIONAL aggregate" for a run whose codes had already been verified
+    # against Annex I.
+    caveat      = paste0(
+      "Numerator is finished-goods trade; denominator is crude production. ",
+      "These are different physical quantities and the ratio is NOT a valid ",
+      "export share. Customs codes: ",
+      if (identical(policy$meta$scope_status, "annex_i_verified")) {
+        if (isTRUE(policy$meta$exclusions_applied_in_query)) {
+          "Annex I verified, carve-outs applied."
+        } else {
+          paste0("Annex I verified but carve-outs NOT subtracted in the query, ",
+                 "so steel and aluminium remain upper bounds; cement is exact.")
+        }
+      } else {
+        "PROVISIONAL aggregates, overstating scope in every sector."
+      }
     )
   ) |>
   arrange(sector, year)

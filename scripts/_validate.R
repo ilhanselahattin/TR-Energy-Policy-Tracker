@@ -894,10 +894,23 @@ gate_policies <- function(dir = "policies", schema_dir = POLICY_SCHEMA_DIR) {
 
   codes_path <- file.path(dir, "cbam_goods_cn_codes.json")
   if (file.exists(codes_path)) {
-    st <- jsonlite::fromJSON(codes_path, simplifyVector = FALSE)$meta$scope_status
-    if (!identical(st, "annex_i_verified")) {
+    cm <- jsonlite::fromJSON(codes_path, simplifyVector = FALSE)$meta
+
+    if (!identical(cm$scope_status, "annex_i_verified")) {
       observations <- c(observations,
         "cbam_goods_cn_codes.json is still PROVISIONAL_AGGREGATE — derived shares are upper bounds")
+    }
+
+    # Two separate claims, and verifying the list must not silence the second.
+    # A code list that names 7204 as excluded while the query still asks for all
+    # of chapter 72 is exactly as much of an overstatement as before — the
+    # difference is only that it is now written down.
+    if (identical(cm$scope_status, "annex_i_verified") &&
+        !isTRUE(cm$exclusions_applied_in_query)) {
+      observations <- c(observations, paste0(
+        "cbam_goods_cn_codes.json: the code list matches Annex I but the query ",
+        "does not subtract the carve-outs. Steel and aluminium shares remain ",
+        "upper bounds; cement is exact. See meta$query_note."))
     }
   }
 

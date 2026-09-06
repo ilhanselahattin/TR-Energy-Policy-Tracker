@@ -3,14 +3,16 @@
 
   "meta": {
     "parameter_set": "cbam_goods_cn_codes",
-    "version": "2026-08-19",
-    "retrieved_date": "2026-08-19",
-    "authoritative_source": "Regulation (EU) 2023/956, ANNEX I — Goods and greenhouse gases covered",
-    "source_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32023R0956",
+    "version": "2026-09-06",
+    "retrieved_date": "2026-09-06",
+    "authoritative_source": "Regulation (EU) 2023/956, ANNEX I — List of goods and greenhouse gases, Official Journal L 130, 16.5.2023, pages 90-93",
+    "source_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=CELEX:32023R0956",
 
-    "scope_status": "PROVISIONAL_AGGREGATE",
-    "scope_warning": "The codes below are HS2/HS4 AGGREGATES, not the CN8 list in Annex I. Annex I could not be retrieved in machine-readable form at the retrieval date. Aggregates OVERSTATE CBAM scope: HS chapter 72 contains steel products that Annex I does not list, and chapter 76 likewise for aluminium. Any eu_export_share computed from these codes is an UPPER BOUND on the true CBAM-covered share.",
-    "action_required": "Transcribe the CN8 codes from ANNEX I of the Official Journal text, replace the `codes` arrays below, and set scope_status to `annex_i_verified`. Until then no figure derived from this file may be published.",
+    "scope_status": "annex_i_verified",
+    "scope_note": "Transcribed 2026-09-06 from the Official Journal PDF itself, pages L 130/90 to L 130/93 — not from a summary or a consultancy list. The earlier HS2/HS4 aggregates have been replaced. Three real differences were found against them: cement was missing 2507 00 80 entirely; iron and steel was missing 2601 12 00 and carried chapter 72 without Annex I's ferro-alloy and scrap carve-outs; aluminium carried the whole of chapter 76, which Annex I does not — it excludes 7602 (waste and scrap) and 7615 (table, kitchen and household articles).",
+
+    "exclusions_applied_in_query": false,
+    "query_note": "THE LIST IS VERIFIED; THE QUERY DOES NOT YET APPLY IT. 01b_fetch_eu_trade.R still asks Comext for the broad headings and cannot subtract the `exclusions` arrays below, so any eu_export_share derived from it remains an UPPER BOUND for iron and steel and for aluminium. Cement is unaffected: Annex I lists all five 2523 subheadings, so the HS4 aggregate and the CN8 list coincide there, and only 2507 00 80 had to be added. Applying the exclusions means querying at CN8 and summing the included codes, which is a change to 01b, not to this file.",
 
     "trade_source": {
       "provider": "Eurostat Comext",
@@ -32,26 +34,31 @@
 
     "cement": {
       "label_tr": "Çimento",
-      "codes": ["2523"],
-      "code_level": "HS4",
-      "description": "Portland cement, aluminous cement, slag cement and clinkers.",
-      "annex_i_note": "Annex I also lists 2507 00 80 (kaolinic clays). Not included in this provisional aggregate."
+      "codes": ["25070080", "25231000", "25232100", "25232900", "25233000", "25239000"],
+      "code_level": "CN8",
+      "gases": ["co2"],
+      "description": "Other kaolinic clays; cement clinkers; white Portland cement; other Portland cement; aluminous cement; other hydraulic cements.",
+      "annex_i_note": "Complete and exact. Annex I lists all five 2523 subheadings, so the previous HS4 aggregate `2523` was not an overstatement — it was simply missing 2507 00 80, which is a clay rather than a cement and is easy to overlook."
     },
 
     "iron-and-steel": {
       "label_tr": "Demir-Çelik",
-      "codes": ["72", "7301", "7302", "7303", "7304", "7305", "7306", "7307", "7308", "7309", "7310", "7311", "7318", "7326"],
-      "code_level": "mixed HS2/HS4",
-      "description": "Chapter 72 (iron and steel) plus the chapter 73 headings for downstream articles that Annex I brings into scope.",
-      "annex_i_note": "Chapter 72 as a whole overstates scope: Annex I excludes certain ferro-alloys and scrap. Narrow this to CN8 before publication."
+      "codes": ["72", "26011200", "7301", "7302", "730300", "7304", "7305", "7306", "7307", "7308", "730900", "7310", "731100", "7318", "7326"],
+      "exclusions": ["72022", "72023000", "72025000", "72027000", "72028000", "72029100", "72029200", "72029300", "72029910", "72029930", "72029980", "7204"],
+      "code_level": "chapter 72 with carve-outs, plus CN8 and HS4 headings",
+      "gases": ["co2"],
+      "description": "Chapter 72 in full except the listed ferro-alloys and ferrous scrap, plus agglomerated iron ores (2601 12 00) and the chapter 73 headings Annex I brings into scope.",
+      "annex_i_note": "`72022` is Annex I's own '7202 2 — Ferro-silicon', a five-digit subheading group rather than a CN8 code; it is stored as written. 7204 is ferrous waste and scrap. Until 01b subtracts these, the steel figure is an upper bound."
     },
 
     "aluminum": {
       "label_tr": "Alüminyum",
-      "codes": ["76"],
-      "code_level": "HS2",
-      "description": "Chapter 76 (aluminium and articles thereof).",
-      "annex_i_note": "Annex I lists specific 7601/7603-7616 headings rather than the whole chapter. Narrow before publication."
+      "codes": ["7601", "7603", "7604", "7605", "7606", "7607", "7608", "76090000", "7610", "76110000", "7612", "76130000", "7614", "7616"],
+      "exclusions": ["7602", "7615"],
+      "code_level": "HS4 and CN8 headings",
+      "gases": ["co2", "pfc"],
+      "description": "Unwrought aluminium, powders, bars, wire, plates, foil, tubes, fittings, structures, reservoirs, casks, containers, stranded wire and other articles.",
+      "annex_i_note": "Chapter 76 as a whole was an overstatement: Annex I omits 7602 (waste and scrap) and 7615 (table, kitchen and household articles). Note the gases — aluminium is the ONLY sector here carrying perfluorocarbons, and Climate TRACE publishes no PFC country package, so aluminium exposure computed by this project is an underestimate by an unknown margin."
     }
   },
 

@@ -35,25 +35,39 @@
     "low": {
       "label_tr": "Düşük senaryo",
       "value_type": "scenario",
-      "description": "Lower carbon price assumption.",
+      "description": "Lower carbon price assumption, EUR 75/tCO2e.",
       "flat_price_eur_t": 75,
       "applies_from": 2026,
       "applies_to": 2034,
-      "source_url": null,
-      "citation_required": true,
-      "citation_note": "KARBON_ATLASI.md section 7 attributes this to an EBRD / Directorate of Climate Change study but gives no URL. Section 7 also states that a regulatory number without a citation is not usable in this project. FIND THE STUDY, record its title, author, year and URL here, or replace the scenario with one that can be cited."
+      "source_url": "https://iklim.gov.tr/en/potential-effects-of-the-carbon-border-adjustment-mechanism-on-the-turkish-economy-has-been-completed-news-4148",
+      "source_title": "Potential Effects of the Carbon Border Adjustment Mechanism on the Turkish Economy",
+      "source_authors": "European Bank for Reconstruction and Development (EBRD) with the Ministry of Environment, Urbanisation and Climate Change / İklim Değişikliği Başkanlığı",
+      "source_year": 2023,
+      "citation_required": false,
+      "retrieved_date": "2026-09-06",
+      "verification_status": "commissioning_body_announcement_verified_report_pdf_pending",
+      "source_note": "Located 2026-09-06. The figure is confirmed in the Ministry's own announcement of the completed study: assuming a CBAM fee of EUR 75/tCO2e on Scope 1 and 2 emissions embedded in goods exported to the EU, potential annual CBAM costs to Turkish industry reach EUR 138 million in 2027. The announcement is the commissioning body's, not the report itself; the report PDF was not located and should replace this URL if it is published.",
+
+      "divergence_from_source": "THE STUDY USES THIS PRICE FOR A SPECIFIC YEAR, THIS PROJECT USES IT FLAT. The study pairs EUR 75 with 2027 and EUR 150 with 2032, i.e. as two points on a rising path. Here both are applied unchanged from 2026 to 2034, which is a different construct: a flat sensitivity band rather than a trajectory. That is a defensible choice for a what-if control but it is NOT what the source did, and METHODOLOGY must say so rather than cite the study as though it endorsed a flat price."
     },
 
     "high": {
       "label_tr": "Yüksek senaryo",
       "value_type": "scenario",
-      "description": "Upper carbon price assumption.",
+      "description": "Upper carbon price assumption, EUR 150/tCO2e.",
       "flat_price_eur_t": 150,
       "applies_from": 2026,
       "applies_to": 2034,
-      "source_url": null,
-      "citation_required": true,
-      "citation_note": "Same study as `low`. Same requirement."
+      "source_url": "https://iklim.gov.tr/en/potential-effects-of-the-carbon-border-adjustment-mechanism-on-the-turkish-economy-has-been-completed-news-4148",
+      "source_title": "Potential Effects of the Carbon Border Adjustment Mechanism on the Turkish Economy",
+      "source_authors": "European Bank for Reconstruction and Development (EBRD) with the Ministry of Environment, Urbanisation and Climate Change / İklim Değişikliği Başkanlığı",
+      "source_year": 2023,
+      "citation_required": false,
+      "retrieved_date": "2026-09-06",
+      "verification_status": "commissioning_body_announcement_verified_report_pdf_pending",
+      "source_note": "Same study as `low`. The announcement states that if the CBAM fee rises to EUR 150/tCO2e, estimated costs reach EUR 2.5 billion per year by 2032.",
+
+      "divergence_from_source": "Same divergence as `low`: the study attaches EUR 150 to 2032, this project applies it flat across 2026-2034."
     },
 
     "custom": {

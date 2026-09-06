@@ -26,6 +26,12 @@
         "scope_warning":   { "type": "string" },
         "action_required": { "type": "string" },
 
+        "exclusions_applied_in_query": {
+          "type": "boolean",
+          "description": "Whether 01b_fetch_eu_trade.R actually SUBTRACTS the Annex I carve-outs when it queries Comext. Separate from scope_status on purpose: transcribing the exclusions and applying them are different jobs, and a list that names 7204 as excluded while the query still asks for all of chapter 72 is still an upper bound. 01b warns while this is false."
+        },
+        "query_note": { "type": "string" },
+
         "trade_source": {
           "type": "object",
           "required": ["provider", "dataset", "endpoint"],
@@ -63,10 +69,25 @@
             "minItems": 1,
             "items": {
               "type": "string",
-              "pattern": "^[0-9]{2}([0-9]{2}([0-9]{2}([0-9]{2})?)?)?$",
-              "description": "HS2, HS4, HS6 or CN8 — an even number of digits, 2 to 8."
+              "pattern": "^[0-9]{2,8}$",
+              "description": "2 to 8 digits. Usually HS2, HS4, HS6 or CN8 — an even number — but NOT always: Annex I writes one entry as '7202 2', a five-digit subheading group covering ferro-silicon. Storing that as '720220' or '72022x' would invent a code the Official Journal does not use, so the pattern admits odd lengths and the entry is kept exactly as printed."
             }
           },
+          "exclusions": {
+            "type": "array",
+            "description": "Codes Annex I explicitly carves OUT of a broader entry — chapter 72 minus the ferro-alloys and scrap, chapter 76 minus waste and kitchenware. Recorded even where the query cannot yet subtract them, because a carve-out that is not written down cannot later be applied.",
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9]{2,8}$"
+            }
+          },
+
+          "gases": {
+            "type": "array",
+            "description": "The greenhouse gases Annex I names for this sector. Aluminium is the only one carrying perfluorocarbons, and no PFC country package is published, so its exposure is knowingly an underestimate.",
+            "items": { "enum": ["co2", "pfc", "n2o"] }
+          },
+
           "code_level":    { "type": "string" },
           "description":   { "type": "string" },
           "annex_i_note":  { "type": "string" }
