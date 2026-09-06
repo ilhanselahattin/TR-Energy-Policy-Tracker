@@ -706,9 +706,124 @@ if (file.exists(GEM_COMMISSIONING)) {
           immediate. = TRUE)
 }
 
+# --- Process route, from the GEM crosscheck trackers -------------------------
+# WHY THIS IS WORTH THE LINES. The atlas's whole thesis is that industrial
+# indirect emissions depend on grid carbon intensity — and whether a steel plant
+# has ANY indirect emissions worth speaking of depends entirely on its process
+# route. An electric arc furnace melts scrap with electricity, so its footprint
+# moves with the grid. A blast furnace reduces ore with coke, so it does not.
+# Two plants in the same sector, the same register and the same province can sit
+# at opposite ends of that question, and until now nothing here distinguished
+# them.
+#
+# For cement the equivalent lever is the clinker ratio: clinker is where cement's
+# process emissions come from, so a plant blending it down emits less per tonne
+# of product regardless of its fuel.
+#
+# TWO TRAPS, BOTH MEASURED:
+#   1. GEM's steel tracker is UNIT-level. 25 matched facilities produce 31 rows,
+#      because İsdemir Payas carries separate BF;BOF, EAF and BF entries. Routes
+#      are therefore collapsed per facility and a plant with both is labelled
+#      as having both, not as whichever row sorted first.
+#   2. The capacity columns are TEXT, and carry "N/A" and ">0" as values. ">0"
+#      means "some capacity, magnitude unpublished" — parsing it as a number
+#      would invent one, so it becomes NA and is counted separately.
+
+parse_gem_capacity <- function(x) {
+  x <- trimws(as.character(x))
+  x[x %in% c("N/A", "n/a", "", "NA", ">0")] <- NA_character_
+  suppressWarnings(as.numeric(x))
+}
+
+routes <- tibble(gem_id = character(), process_route = character(),
+                 cap_crude_kt = numeric(), cap_eaf_kt = numeric(),
+                 cap_bof_kt = numeric(), cap_bf_kt = numeric(),
+                 cap_dri_kt = numeric(), kiln_method = character(),
+                 cap_clinker_mtpa = numeric(),
+                 clinker_substitution = character())
+
+steel_path  <- file.path(DIR_PROCESSED, "gem_crosscheck_steel.csv")
+cement_path <- file.path(DIR_PROCESSED, "gem_crosscheck_cement.csv")
+
+if (file.exists(steel_path)) {
+  st <- read_csv(steel_path, locale = locale(encoding = "UTF-8"),
+                 show_col_types = FALSE, progress = FALSE, guess_max = Inf) |>
+    mutate(gem_id = as.character(gem_id))
+
+  steel_routes <- st |>
+    mutate(across(c(cap_crude, cap_bof, cap_eaf, cap_bf, cap_dri),
+                  parse_gem_capacity)) |>
+    group_by(gem_id) |>
+    summarise(
+      # Collapsed across units. A plant running both an arc furnace and a blast
+      # furnace is "BF-BOF + EAF", which is a real and common configuration in
+      # Turkish integrated works, not an ambiguity to be resolved away.
+      process_route = {
+        eaf <- any(str_detect(coalesce(equipment, ""), "EAF"))
+        bof <- any(str_detect(coalesce(equipment, ""), "BOF|BF"))
+        if (eaf && bof) "BF-BOF + EAF" else if (eaf) "EAF"
+        else if (bof) "BF-BOF" else NA_character_
+      },
+      cap_crude_kt = sum(cap_crude, na.rm = TRUE),
+      cap_eaf_kt   = sum(cap_eaf,   na.rm = TRUE),
+      cap_bof_kt   = sum(cap_bof,   na.rm = TRUE),
+      cap_bf_kt    = sum(cap_bf,    na.rm = TRUE),
+      cap_dri_kt   = sum(cap_dri,   na.rm = TRUE),
+      .groups = "drop"
+    ) |>
+    mutate(across(ends_with("_kt"), ~ if_else(.x == 0, NA_real_, .x)),
+           kiln_method = NA_character_, cap_clinker_mtpa = NA_real_,
+           clinker_substitution = NA_character_)
+
+  routes <- bind_rows(routes, steel_routes)
+  message("      steel process routes for ", nrow(steel_routes), " GEM sites")
+}
+
+if (file.exists(cement_path)) {
+  ce <- read_csv(cement_path, locale = locale(encoding = "UTF-8"),
+                 show_col_types = FALSE, progress = FALSE, guess_max = Inf) |>
+    mutate(gem_id = as.character(gem_id))
+
+  # `clinker_ratio` IS NOT A RATIO, and the name nearly cost a fabricated field.
+  # 01c maps it from GEM's "Clinker substitution rate", which GEM publishes
+  # CATEGORICALLY: the only Turkish values are "unknown", "A", "B" and "0–5%".
+  # Coercing that to numeric yields NA for every row while looking like a
+  # populated column, and coercing "0–5%" to 0.05 would invent a precision the
+  # source refuses to give. It is carried through as text under a name that says
+  # what it is.
+  #
+  # The genuinely numeric and genuinely CBAM-relevant field is clinker CAPACITY:
+  # the Commission's cement benchmarks are defined on clinker, not on cement.
+  parse_mtpa <- function(x) {
+    x <- trimws(as.character(x))
+    x[x %in% c("unknown", "N/A", "n/a", "", "NA")] <- NA_character_
+    suppressWarnings(as.numeric(x))
+  }
+
+  cement_routes <- ce |>
+    group_by(gem_id) |>
+    summarise(
+      kiln_method          = first(na.omit(kiln_method)),
+      cap_clinker_mtpa     = parse_mtpa(first(na.omit(cap_clinker))),
+      clinker_substitution = first(na.omit(clinker_ratio)),
+      .groups = "drop"
+    ) |>
+    mutate(
+      clinker_substitution = if_else(clinker_substitution == "unknown",
+                                     NA_character_, clinker_substitution),
+      process_route = if_else(is.na(kiln_method) | kiln_method == "unknown",
+                              NA_character_, paste0(kiln_method, " kiln")),
+      cap_crude_kt = NA_real_, cap_eaf_kt = NA_real_, cap_bof_kt = NA_real_,
+      cap_bf_kt = NA_real_, cap_dri_kt = NA_real_)
+
+  routes <- bind_rows(routes, cement_routes)
+  message("      cement kiln methods for ", nrow(cement_routes), " GEM sites")
+}
+
 facilities <- geocoded |>
   left_join(operators, by = "source_id") |>
   left_join(gem_matched, by = "source_id") |>
+  left_join(routes, by = "gem_id") |>
   transmute(
     # Prefixed with the source so a second register can never collide with
     # Climate TRACE ids.
@@ -731,6 +846,23 @@ facilities <- geocoded |>
     # Energy assets only; NA for industrial. Drives the fleet-composition view.
     fuel_type        = if_else(asset_class == "energy", source_type,
                                NA_character_),
+
+    # Process route, from GEM's steel and cement trackers. This is the field
+    # that decides whether a facility's emissions move with the grid: an EAF
+    # melts scrap electrically, a blast furnace reduces ore with coke. Both
+    # appear in the same sector and the same province, and the atlas's thesis
+    # depends on telling them apart. NA everywhere GEM has no matching record —
+    # aluminium, and every energy asset.
+    process_route,
+    cap_crude_kt, cap_eaf_kt, cap_bof_kt, cap_bf_kt, cap_dri_kt,
+
+    # Cement's equivalent lever. Clinker carries cement's process emissions and
+    # the Commission's benchmarks are defined on it, so capacity is in clinker
+    # rather than cement. `clinker_substitution` stays TEXT because GEM publishes
+    # it as a band or a letter grade, never a number — see the note above.
+    kiln_method,
+    cap_clinker_mtpa,
+    clinker_substitution,
 
     # Now live, not reserved. Industrial installations hold CBAM-relevant
     # embedded emissions; power stations set the grid intensity that produces

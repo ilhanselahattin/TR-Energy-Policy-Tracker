@@ -666,6 +666,165 @@ gate_fleet_timeline <- function(df, coverage = NULL) {
 
 
 # =============================================================================
+# The ownership gate
+# =============================================================================
+# The characteristic risk here is different from the other tables. Ownership
+# data is not wrong in ways that look like bad numbers; it is wrong in ways that
+# look like FINDINGS — a top-parents table led by "natural person(s)", or an
+# "EU-owned share" computed from a column that is not a share.
+
+# Climate TRACE's placeholders for an owner that is not a named entity.
+NON_ENTITY_OWNERS <- c("natural person(s)", "small shareholder(s)", "unknown")
+
+#' Validate the ownership tables before they are written.
+#'
+#' @param df       the facility x parent long table
+#' @param summary  one row per facility
+#' @param facilities the facility register, for referential integrity
+gate_ownership <- function(df, summary = NULL, facilities = NULL) {
+
+  .gate_header(sprintf("ownership (%d rows, %d facilities)",
+                       nrow(df), dplyr::n_distinct(df$facility_id)))
+
+  failures <- c(
+    require_columns(df, c("facility_id", "parent_name", "parent_hq_country",
+                          "share_pct_unreliable", "is_named_entity",
+                          "is_foreign", "is_eu"), "ownership"),
+    require_complete(df, c("facility_id"))
+  )
+
+  # No ownership row may exist for a facility outside the register: this table
+  # is joined onto the atlas, and an orphan would add a parent to nothing.
+  if (!is.null(facilities) && "facility_id" %in% names(df)) {
+    orphan <- setdiff(unique(df$facility_id), facilities$facility_id)
+    if (length(orphan) > 0) {
+      failures <- c(failures, sprintf(
+        "%d facility_id values are absent from facilities.rds: %s",
+        length(orphan), paste(utils::head(orphan, 5), collapse = ", ")))
+    }
+  }
+
+  # THE FLAG-INTEGRITY CHECK. is_eu must imply is_foreign, and neither may be
+  # true for a Turkish headquarters. These are the two fields any ownership
+  # claim will rest on, and a silent inversion would flip the conclusion rather
+  # than break the build.
+  if (all(c("is_eu", "is_foreign", "parent_hq_country") %in% names(df))) {
+    bad <- sum(df$is_eu & !df$is_foreign, na.rm = TRUE)
+    if (bad > 0) {
+      failures <- c(failures, sprintf(
+        "%d rows are flagged EU but not foreign — the flags contradict", bad))
+    }
+    tr_bad <- sum(df$parent_hq_country == "TUR" &
+                    (df$is_foreign | df$is_eu), na.rm = TRUE)
+    if (tr_bad > 0) {
+      failures <- c(failures, sprintf(
+        "%d rows have a Turkish headquarters flagged foreign or EU", tr_bad))
+    }
+  }
+
+  # A named-entity placeholder leaking through would put "natural person(s)" at
+  # the top of every ownership ranking.
+  if (all(c("is_named_entity", "parent_name") %in% names(df))) {
+    leak <- df |>
+      dplyr::filter(is_named_entity, parent_name %in% NON_ENTITY_OWNERS)
+    if (nrow(leak) > 0) {
+      failures <- c(failures, sprintf(
+        "%d placeholder owners (%s) are flagged as named entities",
+        nrow(leak), paste(unique(leak$parent_name), collapse = ", ")))
+    }
+  }
+
+  # The summary must not contain a weighted ownership percentage. This is the
+  # one rule worth enforcing structurally rather than by comment: the share
+  # column does not partition a facility, so any field whose name promises a
+  # proportion of ownership would be arithmetic on a quantity that cannot bear
+  # it. `opacity` is exempt — it is a ratio of row counts, not of shares.
+  if (!is.null(summary)) {
+    suspect <- grep("(share|pct|percent|weighted)", names(summary),
+                    value = TRUE, ignore.case = TRUE)
+    suspect <- setdiff(suspect, c("parent_primary_share"))
+    if (length(suspect) > 0) {
+      failures <- c(failures, sprintf(
+        paste0("ownership_summary carries %s, which reads as an ownership ",
+               "proportion. `overall_share_percent` is a path product, not a ",
+               "partition — per-facility sums exceed 200%% — so no such figure ",
+               "may be derived from it."),
+        paste(suspect, collapse = ", ")))
+    }
+  }
+
+  .gate_stop(failures, "ownership")
+
+  # ---- WARN tier -----------------------------------------------------------
+  obs <- character(0)
+
+  if (!is.null(facilities)) {
+    missing <- nrow(facilities) - dplyr::n_distinct(df$facility_id)
+    if (missing > 0) {
+      obs <- c(obs, sprintf(
+        "%d of %d facilities have no ownership record at all — they must be ",
+        missing, nrow(facilities)))
+      obs <- c(obs, paste0(
+        "  excluded from ownership counts rather than counted as ",
+        "Turkish-owned by default"))
+    }
+  }
+
+  # The share column's own unreliability, restated with the measurement, on
+  # every build. This is the number that stops someone reaching for it.
+  if ("share_pct_unreliable" %in% names(df)) {
+    sums <- df |>
+      dplyr::filter(!is.na(share_pct_unreliable)) |>
+      dplyr::group_by(facility_id) |>
+      dplyr::summarise(tot = sum(share_pct_unreliable), .groups = "drop")
+    over <- sum(sums$tot > 100.5)
+    obs <- c(obs, sprintf(
+      paste0("ownership shares do not partition: %d of %d facilities have ",
+             "paths summing above 100%% (max %.0f%%). Never weight emissions ",
+             "by this column."),
+      over, nrow(sums), max(sums$tot, na.rm = TRUE)))
+  }
+
+  if ("is_named_entity" %in% names(df)) {
+    obs <- c(obs, sprintf(
+      "%d of %d ownership rows name no company (natural persons, small shareholders, unknown)",
+      sum(!df$is_named_entity), nrow(df)))
+  }
+
+  # The gap between "any" and "certain" IS the uncertainty in every ownership
+  # claim this project can make, so it is printed rather than left to be looked
+  # up. An unquantified final link is also where name collisions hide: nine
+  # Turkish landfill-gas plants operated by a company called "ITC Ltd" resolve
+  # to India's ITC Limited, dragging British American Tobacco and the Government
+  # of India in as owners of Ankara's municipal waste plants.
+  if (!is.null(summary) &&
+      all(c("has_eu_parent", "has_eu_parent_certain",
+            "has_foreign_parent", "has_foreign_parent_certain")
+          %in% names(summary))) {
+    obs <- c(obs, sprintf(
+      paste0("foreign-parent facilities: %d any / %d with a quantified final ",
+             "link. EU27: %d any / %d. These are COUNTS, never shares; the gap ",
+             "is chains whose last hop to the plant is '[unknown %%]'."),
+      sum(summary$has_foreign_parent, na.rm = TRUE),
+      sum(summary$has_foreign_parent_certain, na.rm = TRUE),
+      sum(summary$has_eu_parent, na.rm = TRUE),
+      sum(summary$has_eu_parent_certain, na.rm = TRUE)))
+  }
+
+  if ("path_terminal_unknown" %in% names(df)) {
+    obs <- c(obs, sprintf(
+      "%d of %d rows end in an unquantified link to the facility (%d facilities affected)",
+      sum(df$path_terminal_unknown), nrow(df),
+      dplyr::n_distinct(df$facility_id[df$path_terminal_unknown])))
+  }
+
+  .gate_warn(obs, "ownership")
+
+  invisible(df)
+}
+
+
+# =============================================================================
 # The policy parameter gate
 # =============================================================================
 # Policy files are hand-edited, and hand-edited JSON drifts. A renamed field, a

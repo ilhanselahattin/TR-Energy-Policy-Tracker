@@ -4,7 +4,7 @@
 this file says where it *got to*, what runs, what is blocked, and which traps have already
 been paid for.
 
-Last updated: **2026-09-01** · 40 commits · **~75% complete** · 271 assertions passing
+Last updated: **2026-09-06** · 45 commits · **~78% complete** · 297 assertions passing
 
 > The figure moved 53% → 35% → 58% → 69% → 72% → 76% → 75%. Both falls are denominator
 > corrections, not lost work: the 2026-08-19 scope merge, and then finding on 2026-09-01
@@ -153,6 +153,7 @@ Rscript scripts/01d_fetch_ember.R         # national generation -> grid intensit
 Rscript scripts/02_build_facilities.R     # -> facilities.rds + fleet_renewables.rds
 Rscript scripts/03_build_panel.R          # -> facility_panel.rds (1,800 rows)
 Rscript scripts/04_build_fleet_timeline.R # -> fleet_timeline.csv (2000-2026)
+Rscript scripts/05_build_ownership.R      # -> ownership.rds, who owns the carbon
 
 # tests — run these SEPARATELY from any commit
 Rscript tests/testthat.R
@@ -202,6 +203,10 @@ cached and re-runs take seconds.
 | Coverage of national generation | **52% on v5_9_0, 58% on v5_10_0** — release-dependent, always cite which | derived from the above |
 | GEM vs Climate TRACE conflict | **1 facility** reports emissions before its GEM commissioning year, down from 9 once the match was fixed | panel gate, every build |
 | GEM match quality | median distance **0 m** coal mines, **13 m** power, 82 m cement, 183 m steel; **no GEM site claimed twice** | 02 build log |
+| Steel process route | **84%** of matched crude capacity is **EAF** — 47,230 kt of 60,731 kt. Turkish steel is largely electric, so its footprint moves with the grid | `facilities.rds`, from GEM |
+| Cement | 46 dry kilns; clinker capacity **73.2 Mtpa** across 41 plants | same |
+| Ownership | **261 of 300** facilities have a parent record. Foreign parent: **53 any / 32 with a quantified final link**. EU27: **28 / 26** | `ownership.rds` |
+| TR-ETS threshold | **84 of 88** industrial facilities exceed 50,000 tCO₂ in 2024 — all 58 cement, 24/27 steel, 2/3 aluminium | `tr_ets_coverage.csv` |
 | Verification | **180 assertions**, 0 failures | `Rscript tests/testthat.R` |
 
 ---

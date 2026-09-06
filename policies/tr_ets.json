@@ -51,7 +51,16 @@
   },
 
   "coverage_check_against_this_project": {
-    "comment": "The 50,000 tCO2e threshold means not every facility in facilities.rds is necessarily inside TR-ETS. Once the panel exists, compute how many of the 88 fall above and below the threshold and report it — a facility outside TR-ETS has no domestic carbon price to deduct, which changes its net CBAM position in v2.",
-    "computed": false
+    "comment": "The 50,000 tCO2e threshold means not every facility in facilities.rds is necessarily inside TR-ETS. A facility outside TR-ETS has no domestic carbon price to deduct, which changes its net CBAM position in v2.",
+    "computed": true,
+    "computed_date": "2026-09-06",
+    "computed_by": "scripts/03_build_panel.R",
+    "result_file": "data/processed/tr_ets_coverage.csv",
+
+    "result_summary": "84 of 88 industrial facilities exceed 50,000 tCO2 in the last observed year: all 58 cement plants, 24 of 27 iron and steel, 2 of 3 aluminium. Four fall below — 3 steel and 1 aluminium.",
+
+    "approximation_warning": "THIS IS NOT A DETERMINATION OF TR-ETS COVERAGE. The regulation applies the threshold to the installation's PERMITTED ANNUAL EMISSION CAPACITY, a permitting concept; this project holds REALISED emissions and compares those. A plant permitted above the line but running below it would be counted out here and be inside the system in fact.",
+
+    "scope_mismatch_stands": "Independently of the threshold, TR-ETS covers fertiliser production and this project does not — no open source publishes Turkish fertiliser-production facilities. The two populations therefore do not coincide even where the threshold agrees, and METHODOLOGY must say so before any TR-ETS comparison is drawn."
   }
 }

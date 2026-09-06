@@ -262,6 +262,62 @@ test_that("no combustion plant is dated from a zero-carbon GEM plant", {
 })
 
 
+test_that("process route is only claimed where a register supplies it", {
+  f <- read_processed("facilities.rds")
+
+  # Steel routes come from GEM's steel tracker, cement kiln methods from the
+  # cement tracker. Nothing else has one, so a route on an aluminium plant or a
+  # power station means the join has widened and is attaching a process to a
+  # facility whose process nobody published.
+  eligible <- c("iron-and-steel", "cement")
+  offenders <- f |>
+    dplyr::filter(!sector %in% eligible, !is.na(process_route))
+  expect_equal(nrow(offenders), 0,
+               info = paste("routes outside steel and cement:",
+                            paste(offenders$facility_name_tr, collapse = ", ")))
+
+  # Steel capacity columns belong only to steel.
+  steel_cols <- c("cap_eaf_kt", "cap_bof_kt", "cap_bf_kt", "cap_dri_kt")
+  for (col in steel_cols) {
+    bad <- f |> dplyr::filter(sector != "iron-and-steel", !is.na(.data[[col]]))
+    expect_equal(nrow(bad), 0, info = paste(col, "outside iron-and-steel"))
+  }
+})
+
+
+test_that("clinker substitution is text, because the source is not numeric", {
+  f <- read_processed("facilities.rds")
+
+  # GEM's "Clinker substitution rate" is published as a band or a letter grade —
+  # the Turkish values are "0–5%", "A" and "B". An earlier version parsed it as
+  # a ratio, which produced an all-NA column that looked populated. Coercing
+  # "0–5%" to 0.05 would invent a precision the source refuses to give.
+  expect_type(f$clinker_substitution, "character")
+
+  present <- f$clinker_substitution[!is.na(f$clinker_substitution)]
+  skip_if(length(present) == 0, "no substitution values in this build")
+  expect_false(all(!is.na(suppressWarnings(as.numeric(present)))))
+})
+
+
+test_that("EAF and BOF capacity are consistent with the declared route", {
+  f <- read_processed("facilities.rds")
+  steel <- f |> dplyr::filter(sector == "iron-and-steel", !is.na(process_route))
+  skip_if(nrow(steel) == 0, "no steel routes in this build")
+
+  # A plant labelled EAF cannot carry basic-oxygen capacity, and one labelled
+  # BF-BOF cannot carry arc-furnace capacity. This is the field the whole
+  # indirect-emissions argument turns on: an EAF melts scrap with electricity,
+  # so its footprint moves with the grid; a blast furnace reduces ore with coke
+  # and does not.
+  eaf_only <- steel |> dplyr::filter(process_route == "EAF")
+  expect_true(all(is.na(eaf_only$cap_bof_kt)))
+
+  bof_only <- steel |> dplyr::filter(process_route == "BF-BOF")
+  if (nrow(bof_only) > 0) expect_true(all(is.na(bof_only$cap_eaf_kt)))
+})
+
+
 test_that("a commissioning year always records how it was matched", {
   f <- read_processed("facilities.rds")
 

@@ -479,6 +479,56 @@ panel <- gate_panel(panel, facilities = facilities)
 
 saveRDS(panel, file.path(DIR_PROCESSED, "facility_panel.rds"))
 
+# =============================================================================
+# 9. TR-ETS COVERAGE
+# =============================================================================
+# Closes the TODO that has been sitting in policies/tr_ets.json as
+# `coverage_check_against_this_project: {computed: false}`.
+#
+# TR-ETS applies above 50,000 tCO2e per year. The threshold matters for v2 and
+# not for v1: a facility BELOW it pays no domestic carbon price, so it has
+# nothing to deduct from its CBAM liability, and its net position differs from
+# an identical facility above the line.
+#
+# Two honest limits, both stated in the output:
+#   - The threshold is on "annual emission capacity of the installation", which
+#     is a permitting concept. Realised emissions are what this project has, so
+#     this is an approximation of coverage, not a determination of it.
+#   - TR-ETS also covers fertiliser production, which this project does not
+#     cover at all (no open facility-level source). So the two scopes do not
+#     coincide even where the threshold agrees.
+
+message("[7/7] Checking TR-ETS threshold coverage")
+
+ETS_THRESHOLD_T <- 50000
+
+ets_year <- max(panel$year[panel$value_type == "observed"])
+
+ets_coverage <- panel |>
+  filter(asset_class == "industrial", year == ets_year) |>
+  left_join(facilities |> select(facility_id, facility_name_tr, province_name_tr),
+            by = "facility_id") |>
+  transmute(
+    facility_id, facility_name_tr, sector, province_name_tr,
+    year = ets_year,
+    emissions_t = emissions_reported_t,
+    threshold_t = ETS_THRESHOLD_T,
+    above_threshold = emissions_reported_t >= ETS_THRESHOLD_T,
+    basis = "realised CO2, not permitted annual emission capacity",
+    note = paste0("Approximation. TR-ETS applies the threshold to the ",
+                  "installation's permitted annual emission capacity; this ",
+                  "compares realised emissions in ", ets_year, ".")
+  ) |>
+  arrange(desc(emissions_t))
+
+write_csv(ets_coverage, file.path(DIR_PROCESSED, "tr_ets_coverage.csv"))
+
+n_above <- sum(ets_coverage$above_threshold, na.rm = TRUE)
+message("      ", n_above, " of ", nrow(ets_coverage),
+        " industrial facilities are above 50,000 tCO2 in ", ets_year)
+print(ets_coverage |> count(sector, above_threshold) |> as.data.frame())
+
+
 coverage <- panel |>
   group_by(asset_class, sector, gas_basis, year) |>
   summarise(

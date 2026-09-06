@@ -144,6 +144,7 @@ Rscript scripts/01d_fetch_ember.R        # national generation, grid intensity
 Rscript scripts/02_build_facilities.R    # builds facilities.rds
 Rscript scripts/03_build_panel.R         # builds facility_panel.rds
 Rscript scripts/04_build_fleet_timeline.R # builds the 2000–2026 fleet series
+Rscript scripts/05_build_ownership.R     # builds the parent-company layer
 ```
 
 On Windows use `Rscript`, not `R` — in PowerShell `R` collides with the `Invoke-History`
@@ -267,6 +268,14 @@ argument, with its measurements, will appear in `METHODOLOGY.md`.
   `co2e_100yr` after 6. The panel counts months from the data rather than assuming twelve
   and stores the count, because a bar labelled "2026" beside another labelled "2026"
   asserts a comparability that does not hold here. 2026 is never annualised by scaling.
+- **Ownership is reported as counts of facilities, never as a share of emissions.**
+  Climate TRACE's `overall_share_percent` is a product along an ownership path, not a
+  partition of the asset: summed per facility it reaches 342%, because several paths can
+  reach the same ultimate parent. So "X% of Turkish industrial carbon is EU-owned" is not
+  computable from this data and is not attempted. Each ownership flag also comes in two
+  strengths — any chain, and chains whose final link to the plant is quantified. The gap is
+  real: facilities with a foreign parent fall from 53 to 32 under that filter, while EU27
+  parents fall only from 28 to 26.
 - **The policy timeline covers EU CBAM and the Turkish ETS, and nothing else.** All 13
   events in `policies/policy_timeline.json` are dated 2023 or later, so they sit at the
   right-hand edge of the 2000–2026 fleet chart and **do not explain the curve behind
