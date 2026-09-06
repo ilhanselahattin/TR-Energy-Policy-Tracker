@@ -103,3 +103,93 @@ test_that("provisional data is marked provisional", {
   expect_true(j$meta$scope_status %in%
                 c("PROVISIONAL_AGGREGATE", "annex_i_verified"))
 })
+
+
+# =============================================================================
+# The policy timeline
+# =============================================================================
+# This file is the one place in the project where an interface element makes a
+# claim about POLICY rather than about emissions, so the assertions guard the
+# claim as much as the structure. The register is knowingly partial — only EU
+# CBAM and Turkish ETS, nothing of Turkish energy policy — and the danger is
+# that it stops saying so.
+
+test_that("every timeline event is traceable to a source and a file", {
+  path <- file.path(POLICIES, "policy_timeline.json")
+  skip_if_not(file.exists(path), "policy_timeline.json not present")
+
+  j <- jsonlite::fromJSON(path, simplifyVector = FALSE)
+  expect_gt(length(j$events), 0)
+
+  for (e in j$events) {
+    # §7: a regulatory fact without a citation is not usable here. The same rule
+    # the price scenarios are held to.
+    has_url <- !is.null(e$source_url) && nzchar(e$source_url)
+    expect_true(has_url || isTRUE(e$citation_required),
+                info = paste(e$id, "has neither source_url nor citation_required"))
+
+    # Every event in this file was extracted from a parameter file already in
+    # the repository, and `derived_from` names it so a reader can check the
+    # provenance without leaving the project.
+    expect_true(nzchar(e$derived_from), info = paste(e$id, "has no derived_from"))
+  }
+})
+
+
+test_that("event dates match their declared granularity", {
+  path <- file.path(POLICIES, "policy_timeline.json")
+  skip_if_not(file.exists(path), "policy_timeline.json not present")
+
+  j <- jsonlite::fromJSON(path, simplifyVector = FALSE)
+
+  for (e in j$events) {
+    # Several source facts give only a year. Drawing those as 1 January would
+    # invent a precision the source does not have, so the pair must agree.
+    is_day <- grepl("^[0-9]{4}-[0-9]{2}-[0-9]{2}$", e$date)
+    expect_equal(e$granularity, if (is_day) "day" else "year",
+                 info = paste(e$id, "date", e$date))
+    if (is_day) {
+      expect_false(is.na(suppressWarnings(as.Date(e$date))),
+                   info = paste(e$id, "unparseable date"))
+    }
+  }
+})
+
+
+test_that("event ids are unique and every category is defined", {
+  path <- file.path(POLICIES, "policy_timeline.json")
+  skip_if_not(file.exists(path), "policy_timeline.json not present")
+
+  j <- jsonlite::fromJSON(path, simplifyVector = FALSE)
+
+  ids <- vapply(j$events, function(e) e$id, character(1))
+  expect_equal(anyDuplicated(ids), 0)
+
+  # An undefined category renders with no colour and no label, which looks like
+  # a missing event rather than a broken reference.
+  cats <- vapply(j$events, function(e) e$category, character(1))
+  expect_true(all(cats %in% names(j$categories)))
+})
+
+
+test_that("the timeline does not claim to be complete while it is not", {
+  path <- file.path(POLICIES, "policy_timeline.json")
+  skip_if_not(file.exists(path), "policy_timeline.json not present")
+
+  j <- jsonlite::fromJSON(path, simplifyVector = FALSE)
+
+  expect_true(j$meta$status %in% c("partial", "complete"))
+
+  # `status` is a claim about coverage, and the interface leans on it. It may
+  # only say "complete" once at least one event bears on the fleet — Turkish
+  # energy policy is what would make that true. Flipping the string alone must
+  # not be enough.
+  if (identical(j$meta$status, "complete")) {
+    expect_true(any(vapply(j$events,
+                           function(e) isTRUE(e$affects_fleet), logical(1))))
+  } else {
+    # While partial, the file must keep saying what it is missing, because the
+    # interface quotes that field back to the reader.
+    expect_true(nzchar(j$meta$what_is_missing))
+  }
+})

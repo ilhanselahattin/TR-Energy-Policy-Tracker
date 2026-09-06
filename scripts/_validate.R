@@ -777,6 +777,70 @@ gate_policies <- function(dir = "policies", schema_dir = POLICY_SCHEMA_DIR) {
 
   # --- Relationship checks JSON Schema cannot express ------------------------
 
+  timeline_path <- file.path(dir, "policy_timeline.json")
+  if (file.exists(timeline_path)) {
+    tl <- jsonlite::fromJSON(timeline_path, simplifyDataFrame = FALSE)
+    ev <- tl$events
+
+    ids <- vapply(ev, function(e) e$id, character(1))
+    if (anyDuplicated(ids) > 0) {
+      failures <- c(failures, sprintf(
+        "policy_timeline.json: duplicate event id (%s). Ids are referenced from the interface and must be stable and unique.",
+        paste(unique(ids[duplicated(ids)]), collapse = ", ")))
+    }
+
+    for (e in ev) {
+      # A bare year with granularity "day", or a full date with granularity
+      # "year", means the two disagree — and the interface trusts granularity to
+      # decide whether to draw a point or a band. Schema can check the pattern
+      # but not the pairing.
+      is_day <- grepl("^[0-9]{4}-[0-9]{2}-[0-9]{2}$", e$date)
+      if (is_day && e$granularity != "day") {
+        failures <- c(failures, sprintf(
+          "policy_timeline.json: %s carries a full date but granularity '%s'",
+          e$id, e$granularity))
+      }
+      if (!is_day && e$granularity != "year") {
+        failures <- c(failures, sprintf(
+          "policy_timeline.json: %s carries a bare year but granularity '%s'",
+          e$id, e$granularity))
+      }
+      if (is_day && is.na(suppressWarnings(as.Date(e$date)))) {
+        failures <- c(failures, sprintf(
+          "policy_timeline.json: %s has an unparseable date '%s'", e$id, e$date))
+      }
+
+      # Section 7: a regulatory fact without a citation is not usable. Same rule
+      # the price scenarios are held to.
+      has_url <- !is.null(e$source_url) && nzchar(e$source_url)
+      if (!has_url && !isTRUE(e$citation_required)) {
+        failures <- c(failures, sprintf(
+          "policy_timeline.json: %s has no source_url and does not admit citation_required",
+          e$id))
+      }
+
+      # A category the file does not define would render with no colour and no
+      # label, which reads as a missing event rather than a broken reference.
+      if (!e$category %in% names(tl$categories)) {
+        failures <- c(failures, sprintf(
+          "policy_timeline.json: %s uses category '%s', which is not defined in `categories`",
+          e$id, e$category))
+      }
+    }
+
+    # `status` is a claim about coverage. It may only say "complete" when at
+    # least one event actually claims to bear on the fleet — otherwise the file
+    # is asserting it covers the policy history while containing nothing that
+    # touches the period the fleet chart draws.
+    if (identical(tl$meta$status, "complete") &&
+        !any(vapply(ev, function(e) isTRUE(e$affects_fleet), logical(1)))) {
+      failures <- c(failures, paste0(
+        "policy_timeline.json: status is 'complete' but no event is marked ",
+        "affects_fleet. Turkish energy policy is what would make it complete; ",
+        "see meta$what_is_missing."))
+    }
+  }
+
   phase_in_path <- file.path(dir, "cbam_phase_in.json")
   if (file.exists(phase_in_path)) {
     p <- jsonlite::fromJSON(phase_in_path)$phase_in

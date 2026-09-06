@@ -352,7 +352,15 @@ dashboardPage(
                 selected = "cum"
               ),
               plotOutput("fleet_plot", height = 300),
+              checkboxInput("show_policy", "Politika olaylarını göster",
+                            value = TRUE),
               uiOutput("fleet_plot_note")
+            ),
+            box(
+              width = NULL, status = "danger", solidHeader = TRUE,
+              title = "Politika Takvimi",
+              collapsible = TRUE,
+              uiOutput("policy_panel")
             ),
             box(
               width = NULL, status = "warning", solidHeader = TRUE,

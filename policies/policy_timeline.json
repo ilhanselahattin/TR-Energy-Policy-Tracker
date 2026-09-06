@@ -1,0 +1,196 @@
+{
+  "_comment": "Dated policy events, for the timeline view. EVERY EVENT HERE IS DERIVED FROM A PARAMETER FILE ALREADY IN THIS FOLDER — nothing was newly researched, and `derived_from` names the file each fact came out of so it can be checked without leaving the repository. Read at runtime; never hardcode (KARBON_ATLASI.md section 7).",
+
+  "meta": {
+    "parameter_set": "policy_timeline",
+    "version": "2026-09-01",
+    "retrieved_date": "2026-09-01",
+    "status": "partial",
+
+    "what_is_here": "The EU CBAM regulatory calendar and the Turkish ETS calendar, extracted from cbam_phase_in.json, carbon_price_scenarios.json and tr_ets.json. These are the events that change what this project CALCULATES.",
+
+    "what_is_missing": "Turkish energy policy. YEKDEM and its revisions, the capacity mechanism, coal support, the licensing regime, the 2053 net-zero target, NDC updates. Those are the events that would explain the shape of the 2000-2026 fleet curve, and NONE of them are here. They cannot be extracted from anything already in this repository: there is no open machine-readable register of Turkish energy policy, so each one has to be read out of the Resmi Gazete, an EPDK decision or a ministry publication, and given a source. That is author work under section 9 and is tracked as catalogue item K11.",
+
+    "why_that_matters_for_the_chart": "Every event in this file is dated 2023 or later. The fleet timeline runs from 2000. So these markers cluster at the right-hand edge and DO NOT explain the curve behind them — the Turkish renewable build-out of 2015-2024 had already happened before any of this regulation existed. The interface must say so rather than let the reader infer a causal link that this file cannot support.",
+
+    "granularity_note": "Some source facts carry an exact date, others only a year. `granularity` records which, so a year-only event is never drawn as though it happened on 1 January."
+  },
+
+  "categories": {
+    "cbam":         { "label_tr": "AB SKDM",        "colour": "#FF9F1C" },
+    "carbon_price": { "label_tr": "Karbon fiyatı",  "colour": "#FFD166" },
+    "tr_ets":       { "label_tr": "Türkiye ETS",    "colour": "#4CC9F0" }
+  },
+
+  "events": [
+    {
+      "id": "cbam_transitional_start",
+      "date": "2023-10-01",
+      "granularity": "day",
+      "category": "cbam",
+      "regime_id": "EU_CBAM",
+      "value_type": "legislated",
+      "title_tr": "SKDM geçiş dönemi başladı",
+      "summary_tr": "Yalnızca raporlama yükümlülüğü. Bu dönemde ithalatçının sertifika satın alma zorunluluğu yok; gömülü emisyonun beyanı isteniyor.",
+      "affects_fleet": false,
+      "source_url": "https://www.europarl.europa.eu/legislative-train/package-fit-for-55/file-carbon-border-adjustment-mechanism",
+      "derived_from": "policies/cbam_phase_in.json"
+    },
+    {
+      "id": "cbam_transitional_end",
+      "date": "2025-12-31",
+      "granularity": "day",
+      "category": "cbam",
+      "regime_id": "EU_CBAM",
+      "value_type": "legislated",
+      "title_tr": "Geçiş dönemi sona erdi",
+      "summary_tr": "Raporlama-yalnızca rejimin son günü.",
+      "affects_fleet": false,
+      "source_url": "https://www.europarl.europa.eu/legislative-train/package-fit-for-55/file-carbon-border-adjustment-mechanism",
+      "derived_from": "policies/cbam_phase_in.json"
+    },
+    {
+      "id": "cbam_definitive_start",
+      "date": "2026-01-01",
+      "granularity": "day",
+      "category": "cbam",
+      "regime_id": "EU_CBAM",
+      "value_type": "legislated",
+      "title_tr": "SKDM kesin rejimi yürürlükte",
+      "summary_tr": "Mali yükümlülük başlıyor. Faz-in katsayısı ilk yıl 0,025: gömülü emisyonun yalnızca %2,5'i için sertifika teslim ediliyor, kalanı AB ETS ücretsiz tahsisatına karşılık geliyor.",
+      "affects_fleet": false,
+      "source_url": "https://www.europarl.europa.eu/legislative-train/package-fit-for-55/file-carbon-border-adjustment-mechanism",
+      "derived_from": "policies/cbam_phase_in.json"
+    },
+    {
+      "id": "cbam_price_q1_2026",
+      "date": "2026-04-07",
+      "granularity": "day",
+      "category": "carbon_price",
+      "regime_id": "EU_CBAM",
+      "value_type": "observed",
+      "title_tr": "İlk çeyreklik sertifika fiyatı: 75,36 €/tCO₂e",
+      "summary_tr": "Komisyon her çeyrek fiyatını, AB ETS açık artırma kapanış fiyatlarının ağırlıklı ortalaması olarak hesaplıyor ve çeyreği izleyen ilk takvim haftasında yayımlıyor.",
+      "affects_fleet": false,
+      "source_url": "https://taxation-customs.ec.europa.eu/carbon-border-adjustment-mechanism/price-cbam-certificates_en",
+      "derived_from": "policies/carbon_price_scenarios.json"
+    },
+    {
+      "id": "cbam_price_q2_2026",
+      "date": "2026-07-06",
+      "granularity": "day",
+      "category": "carbon_price",
+      "regime_id": "EU_CBAM",
+      "value_type": "observed",
+      "title_tr": "İkinci çeyrek sertifika fiyatı: 75,28 €/tCO₂e",
+      "summary_tr": "İki çeyrek yayımlandı, ikisi daha bekleniyor. Yıllık bir fiyat HENÜZ YOK ve mevcut iki çeyreğin ortalaması alınarak üretilmiyor — bu uydurma olurdu.",
+      "affects_fleet": false,
+      "source_url": "https://taxation-customs.ec.europa.eu/carbon-border-adjustment-mechanism/price-cbam-certificates_en",
+      "derived_from": "policies/carbon_price_scenarios.json"
+    },
+    {
+      "id": "cbam_price_q3_2026",
+      "date": "2026-10-05",
+      "granularity": "day",
+      "category": "carbon_price",
+      "regime_id": "EU_CBAM",
+      "value_type": "scheduled",
+      "title_tr": "Üçüncü çeyrek fiyatının planlanan yayın tarihi",
+      "summary_tr": "Henüz yayımlanmadı. Planlanan tarih olarak işaretli; gerçekleşen bir değer değil.",
+      "affects_fleet": false,
+      "source_url": "https://taxation-customs.ec.europa.eu/carbon-border-adjustment-mechanism/price-cbam-certificates_en",
+      "derived_from": "policies/carbon_price_scenarios.json"
+    },
+    {
+      "id": "cbam_price_q4_2026",
+      "date": "2027-01-04",
+      "granularity": "day",
+      "category": "carbon_price",
+      "regime_id": "EU_CBAM",
+      "value_type": "scheduled",
+      "title_tr": "Dördüncü çeyrek fiyatının planlanan yayın tarihi",
+      "summary_tr": "Bu yayımlandığında 2026 için yıllık bir fiyat hesaplanabilir hale gelir ve kullanılan toplulaştırma kuralı kayda geçirilmelidir.",
+      "affects_fleet": false,
+      "source_url": "https://taxation-customs.ec.europa.eu/carbon-border-adjustment-mechanism/price-cbam-certificates_en",
+      "derived_from": "policies/carbon_price_scenarios.json"
+    },
+    {
+      "id": "tr_ets_pilot_start",
+      "date": "2026",
+      "granularity": "year",
+      "category": "tr_ets",
+      "regime_id": "TR_ETS",
+      "value_type": "legislated",
+      "title_tr": "TR-ETS pilot dönemi başlıyor",
+      "summary_tr": "Tahsisatın %100'ü ücretsiz, kıyas (benchmark) yöntemiyle. Mali yükümlülük yok; amaç MRV altyapısını sınamak. Eşik: yılda 50.000 tCO₂e.",
+      "affects_fleet": false,
+      "source_url": "https://iklim.gov.tr/turkiye-emisyon-ticaret-sistemi-yonetmeligi-taslagi-yayimlandi-haber-4519",
+      "derived_from": "policies/tr_ets.json"
+    },
+    {
+      "id": "tr_ets_pilot_end",
+      "date": "2027",
+      "granularity": "year",
+      "category": "tr_ets",
+      "regime_id": "TR_ETS",
+      "value_type": "legislated",
+      "title_tr": "Pilot dönem sona eriyor",
+      "summary_tr": "Pilot dönemin uyum son tarihi 2029-04-30.",
+      "affects_fleet": false,
+      "source_url": "https://iklim.gov.tr/turkiye-emisyon-ticaret-sistemi-yonetmeligi-taslagi-yayimlandi-haber-4519",
+      "derived_from": "policies/tr_ets.json"
+    },
+    {
+      "id": "tr_ets_first_compliance_start",
+      "date": "2028",
+      "granularity": "year",
+      "category": "tr_ets",
+      "regime_id": "TR_ETS",
+      "value_type": "legislated",
+      "title_tr": "İlk yükümlülük dönemi başlıyor — SKDM mahsubu burada anlam kazanıyor",
+      "summary_tr": "SKDM, menşe ülkede FİİLEN ÖDENEN karbon fiyatının düşülmesine izin veriyor. Pilot dönemde tahsisat tamamen ücretsiz olduğu için düşülecek tutar yaklaşık sıfır; bu yüzden v1'de mahsubu atlamak sadeleştirme değil, DOĞRU işlem. 2028'den itibaren maddi hale geliyor.",
+      "affects_fleet": false,
+      "source_url": "https://iklim.gov.tr/turkiye-emisyon-ticaret-sistemi-yonetmeligi-taslagi-yayimlandi-haber-4519",
+      "derived_from": "policies/tr_ets.json"
+    },
+    {
+      "id": "tr_ets_pilot_compliance_deadline",
+      "date": "2029-04-30",
+      "granularity": "day",
+      "category": "tr_ets",
+      "regime_id": "TR_ETS",
+      "value_type": "legislated",
+      "title_tr": "Pilot dönem uyum son tarihi",
+      "summary_tr": "Pilot dönem yükümlülüklerinin kapatılması için son gün.",
+      "affects_fleet": false,
+      "source_url": "https://iklim.gov.tr/turkiye-emisyon-ticaret-sistemi-yonetmeligi-taslagi-yayimlandi-haber-4519",
+      "derived_from": "policies/tr_ets.json"
+    },
+    {
+      "id": "cbam_full_application",
+      "date": "2034",
+      "granularity": "year",
+      "category": "cbam",
+      "regime_id": "EU_CBAM",
+      "value_type": "legislated",
+      "title_tr": "SKDM tam uygulamada — faz-in katsayısı 1,0",
+      "summary_tr": "AB ETS ücretsiz tahsisatı SKDM sektörleri için sıfırlanıyor ve gömülü emisyonun tamamı için sertifika teslim ediliyor.",
+      "affects_fleet": false,
+      "source_url": "https://www.europarl.europa.eu/legislative-train/package-fit-for-55/file-carbon-border-adjustment-mechanism",
+      "derived_from": "policies/cbam_phase_in.json"
+    },
+    {
+      "id": "tr_ets_first_compliance_end",
+      "date": "2035",
+      "granularity": "year",
+      "category": "tr_ets",
+      "regime_id": "TR_ETS",
+      "value_type": "legislated",
+      "title_tr": "İlk yükümlülük dönemi sona eriyor",
+      "summary_tr": "Bu dönem için ücretsiz tahsisat payı yayımlanmış ikincil mevzuatta henüz belirlenmemiş; tahmin edilmek yerine boş bırakıldı.",
+      "affects_fleet": false,
+      "source_url": "https://iklim.gov.tr/turkiye-emisyon-ticaret-sistemi-yonetmeligi-taslagi-yayimlandi-haber-4519",
+      "derived_from": "policies/tr_ets.json"
+    }
+  ]
+}

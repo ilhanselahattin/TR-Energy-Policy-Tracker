@@ -267,6 +267,15 @@ argument, with its measurements, will appear in `METHODOLOGY.md`.
   `co2e_100yr` after 6. The panel counts months from the data rather than assuming twelve
   and stores the count, because a bar labelled "2026" beside another labelled "2026"
   asserts a comparability that does not hold here. 2026 is never annualised by scaling.
+- **The policy timeline covers EU CBAM and the Turkish ETS, and nothing else.** All 13
+  events in `policies/policy_timeline.json` are dated 2023 or later, so they sit at the
+  right-hand edge of the 2000–2026 fleet chart and **do not explain the curve behind
+  them** — the Turkish renewable build-out of 2015–2024 happened before any of that
+  regulation existed. The Turkish energy policy that would explain it (YEKDEM, the
+  capacity mechanism, coal support, the licensing regime) is absent: no open
+  machine-readable register of it exists, so each entry has to be read out of a primary
+  source and cited. The interface states this above the calendar rather than leaving the
+  reader to infer a causal link the file cannot support.
 - **The fleet timeline shows cumulative commissioning, not the operating fleet.** Global
   Energy Monitor records a retirement year for 2 of 4,174 Turkish rows, so a plant that
   closed in 2015 stays on the curve for ever. Ember's actual installed capacity is drawn

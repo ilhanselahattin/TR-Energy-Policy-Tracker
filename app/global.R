@@ -26,6 +26,7 @@ suppressPackageStartupMessages({
   library(shinydashboard)
   library(leaflet)
   library(dplyr)
+  library(jsonlite)
 })
 
 
@@ -420,6 +421,80 @@ TIMELINE_YEARS <- if (!is.null(fleet_timeline)) {
 # journey is the right place to start reading, and there is no projection
 # problem: a commissioning year is a record, not an estimate.
 TIMELINE_DEFAULT <- if (length(TIMELINE_YEARS) > 0) max(TIMELINE_YEARS) else NA
+
+
+# =============================================================================
+# 7. POLICY TIMELINE
+# =============================================================================
+# Dated regulatory events, read from policies/policy_timeline.json at runtime
+# like every other policy parameter (§7).
+#
+# READ meta$what_is_missing BEFORE TRUSTING THIS VIEW. Every event currently in
+# the file is EU CBAM or Turkish ETS, and every one is dated 2023 or later. The
+# Turkish energy policy that would explain the 2000-2026 fleet curve — YEKDEM,
+# the capacity mechanism, coal support, the licensing regime — is not here,
+# because no open machine-readable register of it exists and each entry has to
+# be read out of a primary source and cited. That is author work under §9.
+#
+# The consequence for the chart is stated rather than left to be inferred: these
+# markers sit at the right-hand edge and do not explain the curve behind them.
+# The renewable build-out of 2015-2024 had already happened before any of this
+# regulation existed.
+
+POLICY_TIMELINE_PATH <- file.path(PROJECT_ROOT, "policies",
+                                  "policy_timeline.json")
+
+policy_timeline <- if (file.exists(POLICY_TIMELINE_PATH)) {
+  jsonlite::fromJSON(POLICY_TIMELINE_PATH, simplifyDataFrame = FALSE)
+} else NULL
+
+# Flattened to a data frame for plotting, with a numeric year for the x axis.
+# A year-only event is placed at mid-year rather than at 1 January, so it is not
+# drawn with a precision its source does not have.
+policy_events <- if (!is.null(policy_timeline)) {
+  do.call(rbind, lapply(policy_timeline$events, function(e) {
+    yr <- as.integer(substr(e$date, 1, 4))
+    x  <- if (identical(e$granularity, "day")) {
+      d <- as.Date(e$date)
+      yr + (as.integer(format(d, "%j")) - 1) / 365
+    } else yr + 0.5
+
+    data.frame(
+      id         = e$id,
+      date       = e$date,
+      granularity = e$granularity,
+      year       = yr,
+      x          = x,
+      category   = e$category,
+      value_type = e$value_type,
+      title_tr   = e$title_tr,
+      summary_tr = e$summary_tr,
+      affects_fleet = isTRUE(e$affects_fleet),
+      source_url = if (is.null(e$source_url)) NA_character_ else e$source_url,
+      derived_from = e$derived_from,
+      stringsAsFactors = FALSE
+    )
+  }))
+} else NULL
+
+if (!is.null(policy_events)) {
+  policy_events <- policy_events[order(policy_events$x), ]
+}
+
+POLICY_CATEGORY_LABELS <- if (!is.null(policy_timeline)) {
+  vapply(policy_timeline$categories, function(c) c$label_tr, character(1))
+} else character(0)
+
+POLICY_CATEGORY_COLOURS <- if (!is.null(policy_timeline)) {
+  vapply(policy_timeline$categories, function(c) c$colour, character(1))
+} else character(0)
+
+POLICY_VALUE_TYPE_LABELS <- c(
+  "legislated" = "Mevzuat",
+  "observed"   = "Gerçekleşen",
+  "scheduled"  = "Planlanan",
+  "assumption" = "Varsayım"
+)
 
 FLEET_LABELS <- c(
   "hydropower"          = "Hidroelektrik",

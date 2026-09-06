@@ -1,0 +1,106 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "policy_timeline",
+  "description": "Dated policy events. The schema enforces structure; scripts/_validate.R enforces the relationships JSON Schema cannot express — unique ids, parseable dates, and the rule that a date's precision must match its declared granularity.",
+  "type": "object",
+  "required": ["meta", "categories", "events"],
+  "additionalProperties": false,
+
+  "properties": {
+    "_comment": { "type": "string" },
+
+    "meta": {
+      "type": "object",
+      "required": ["parameter_set", "version", "retrieved_date", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "parameter_set": { "const": "policy_timeline" },
+        "version":        { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+        "retrieved_date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+
+        "status": {
+          "description": "`partial` while Turkish energy policy is absent. It must not silently become `complete` — changing it is a claim that the register covers what it says it covers.",
+          "enum": ["partial", "complete"]
+        },
+
+        "what_is_here":               { "type": "string" },
+        "what_is_missing":            { "type": "string" },
+        "why_that_matters_for_the_chart": { "type": "string" },
+        "granularity_note":           { "type": "string" }
+      }
+    },
+
+    "categories": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "required": ["label_tr", "colour"],
+        "additionalProperties": false,
+        "properties": {
+          "label_tr": { "type": "string", "minLength": 1 },
+          "colour":   { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" }
+        }
+      }
+    },
+
+    "events": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "id", "date", "granularity", "category", "value_type",
+          "title_tr", "summary_tr", "affects_fleet", "derived_from"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9_]+$",
+            "description": "Stable identifier. Referenced from the interface and from any future link between an event and the facilities it affects, so it must not change once published."
+          },
+
+          "date": {
+            "type": "string",
+            "pattern": "^[0-9]{4}(-[0-9]{2}-[0-9]{2})?$",
+            "description": "Either YYYY-MM-DD or a bare YYYY. Which one is legitimate is governed by `granularity`, checked in R."
+          },
+
+          "granularity": {
+            "enum": ["day", "year"],
+            "description": "Recorded rather than inferred. Several source facts give only a year, and drawing those as 1 January would invent a precision the source does not have."
+          },
+
+          "category":  { "type": "string", "minLength": 1 },
+          "regime_id": { "type": "string", "minLength": 1 },
+
+          "value_type": {
+            "enum": ["legislated", "observed", "scheduled", "assumption"],
+            "description": "`scheduled` is a publication date that has not happened yet and must never be rendered as an event that did."
+          },
+
+          "title_tr":   { "type": "string", "minLength": 1 },
+          "summary_tr": { "type": "string", "minLength": 1 },
+
+          "affects_fleet": {
+            "type": "boolean",
+            "description": "Whether this event plausibly shaped the Turkish generation fleet. Every event currently in the file is false: they are all dated 2023 or later, and the fleet curve they would be drawn over runs from 2000. Setting it true is a causal claim and needs to be defensible."
+          },
+
+          "source_url": {
+            "type": ["string", "null"],
+            "description": "Carried through from the parameter file the event was derived from."
+          },
+
+          "citation_required": { "type": "boolean" },
+
+          "derived_from": {
+            "type": "string",
+            "description": "The file in this repository the fact came out of, so it can be checked without leaving the project. An event researched from scratch would name its own primary source here instead."
+          }
+        }
+      }
+    }
+  }
+}

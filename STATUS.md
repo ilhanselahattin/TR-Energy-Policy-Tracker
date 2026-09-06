@@ -4,12 +4,14 @@
 this file says where it *got to*, what runs, what is blocked, and which traps have already
 been paid for.
 
-Last updated: **2026-09-01** · 37 commits · **~76% complete** · 215 assertions passing
+Last updated: **2026-09-01** · 40 commits · **~75% complete** · 271 assertions passing
 
-> The figure moved 53% → 35% → 58% → 69% → 72% → 76%. The drop was the scope merge on
-> 2026-08-19 growing the denominator, not work being lost. The recoveries are the energy
-> half, the panel, the time slider the panel unblocked, and now the fleet timeline. What
-> remains is disproportionately the analytical core, which §9 reserves for the author.
+> The figure moved 53% → 35% → 58% → 69% → 72% → 76% → 75%. Both falls are denominator
+> corrections, not lost work: the 2026-08-19 scope merge, and then finding on 2026-09-01
+> that the component table had never carried a row for policy tracking at all — a scope
+> item the v1 table and `ROADMAP.md` both list. The rises are the energy half, the panel,
+> the time slider, and the fleet timeline. What remains is disproportionately the
+> analytical core, which §9 reserves for the author.
 >
 > **Two time axes now, answering different questions.** The map tab runs 2021–2026 over the
 > emissions panel. The fleet tab runs 2000–2026 over `commissioning_year`. Each has its own
@@ -81,6 +83,7 @@ and the arithmetic on top of it.
 | Grid factor **selection** | Author decision — three estimates exist, `selection.chosen` is deliberately `null` |
 | Cost layer, audit-trail panel | **B9** — there is no liability figure to display yet |
 | Net operating fleet over time | **not buildable from these sources.** GEM records a retirement year for 2 of 4,174 Turkish rows, so the timeline is cumulative commissioning only — a plant that closed in 2015 stays on the curve. Ember's installed capacity is drawn alongside so the shortfall is visible, but it is coverage *minus* retirement and cannot be attributed to either |
+| **Turkish energy policy register** | **author** — YEKDEM, capacity mechanism, coal support, licensing, 2053 net zero, NDC updates. No open machine-readable register exists, so each entry must be read out of a primary source and cited. The schema, gate, view and tests are built and waiting; only the entries are missing. Catalogue item **K11** |
 | `METHODOLOGY.md` | author writes the prose (§9) |
 
 **B2 is closed.** The monthly→annual aggregation rule was decided 2026-09-01 and is
@@ -110,8 +113,15 @@ ratios are **recomputed from annual totals** rather than averaged across months.
 | Energy emissions panel | 6 | ✅ |
 | `facility_panel.rds` (industrial) | 8 | ◐ 65% — built, gated and tested; `co2_direct_t` / `co2_indirect_t` await B1 |
 | CBAM calculation core | 8 | ❌ |
+| **Policy timeline / tracker** | **5** | ◐ 50% — schema, gate, tests, view and 13 sourced EU CBAM + TR-ETS events are built; the Turkish energy policy register is not, and it is the half that bears on the fleet |
 | `METHODOLOGY.md` | 5 | ❌ |
 | Zenodo / JOSS packaging | 2 | ❌ |
+
+**The policy row was missing from this table until 2026-09-01**, so every earlier
+percentage was measured against a denominator that omitted a scope item the v1 table and
+`ROADMAP.md` both list. Adding it grows the denominator to 105 and takes the figure from
+76% down to 75% — the number fell while work was done, which is what happens when a
+measurement is corrected rather than improved.
 
 **Of the remaining ~42 points, about 25 are the author's own work** under §9 — the
 direct/indirect decomposition, the annual aggregation rule, the `eu_export_share`

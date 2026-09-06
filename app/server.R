@@ -1042,6 +1042,29 @@ function(input, output, session) {
       lines(d$year, d[[n_col]], col = TL_COLOURS[[g]], lwd = 1.4, lty = 2)
     }
 
+    # Policy events as vertical marks. Drawn last so they sit above the curves,
+    # and only where they fall inside the plotted window — several run past 2026
+    # and clipping them silently would misrepresent the calendar as ending.
+    if (isTRUE(input$show_policy) && !is.null(policy_events)) {
+      pe <- policy_events[policy_events$x >= min(yrs) &
+                            policy_events$x <= max(yrs), ]
+      if (nrow(pe) > 0) {
+        cols <- POLICY_CATEGORY_COLOURS[pe$category]
+        # A scheduled publication has not happened. Dotted, like every other
+        # not-yet-real quantity in this project.
+        ltys <- ifelse(pe$value_type == "scheduled", 3, 1)
+        for (i in seq_len(nrow(pe))) {
+          abline(v = pe$x[i], col = paste0(cols[i], "AA"),
+                 lwd = 1.6, lty = ltys[i])
+        }
+        # Ticks along the top edge rather than labels: thirteen labels on a
+        # 26-year axis would be unreadable, and the panel below carries the text.
+        usr <- par("usr")
+        points(pe$x, rep(usr[4] * 0.985, nrow(pe)), pch = 25,
+               col = cols, bg = cols, cex = 0.7)
+      }
+    }
+
     abline(v = fleet_year(), col = "#33333366", lwd = 1.5, lty = 3)
   })
 
@@ -1053,9 +1076,115 @@ function(input, output, session) {
       " Yenilenebilirin iki eğrisinin açılması bir bulgudur: çok sayıda, çok ",
       "küçük santral. Sanayi ve kömür/petrol-gaz yalnızca sayılır — ",
       "kapasiteleri ton ve varil cinsinden olduğu için megawatt eksenine ",
-      "girmez. Noktalı gri çizgi Ember'in gerçek ulusal kurulu gücüdür."
+      "girmez. Noktalı gri çizgi Ember'in gerçek ulusal kurulu gücüdür.",
+      if (isTRUE(input$show_policy) && !is.null(policy_events)) {
+        inside <- sum(policy_events$x >= min(fleet_timeline$year) &
+                        policy_events$x <= max(fleet_timeline$year))
+        tagList(
+          tags$br(), tags$br(),
+          tags$b("Dikey renkli çizgiler politika olaylarıdır."),
+          " Takvimdeki ", nrow(policy_events), " olaydan yalnızca ",
+          tags$b(inside), " tanesi bu pencereye düşüyor; kalanı ",
+          max(fleet_timeline$year), " sonrası. ",
+          tags$b("Hiçbiri eğrideki kırılmaları açıklamıyor"),
+          " — onları açıklayacak Türkiye enerji politikası takvimi henüz ",
+          "derlenmedi. Noktalı olanlar henüz gerçekleşmemiş planlanan tarihler."
+        )
+      }
     )
   })
+
+  # --- the policy calendar ----------------------------------------------------
+  # Every event here is derived from a parameter file already in the repository,
+  # and each row says which one. What the panel says most loudly is what it does
+  # NOT contain, because a policy tracker that quietly covers only EU regulation
+  # would be read as covering Turkish policy too.
+
+  output$policy_panel <- renderUI({
+    if (is.null(policy_events)) {
+      return(tags$p(style = "font-size:13px; color:#888;",
+                    "Politika takvimi dosyası bulunamadı: ",
+                    tags$code("policies/policy_timeline.json")))
+    }
+
+    yr <- fleet_year()
+    ev <- policy_events
+
+    row_ui <- function(i) {
+      e   <- ev[i, ]
+      col <- POLICY_CATEGORY_COLOURS[[e$category]]
+      # Events the slider has not reached yet are dimmed rather than hidden, so
+      # the calendar reads as a calendar and not as a filtered list.
+      future <- e$year > yr
+
+      tags$div(
+        style = paste0(
+          "padding:9px 0 9px 11px; border-left:3px solid ", col,
+          "; margin-bottom:9px;", if (future) " opacity:.5;" else ""),
+        tags$div(
+          style = "display:flex; gap:8px; align-items:baseline; flex-wrap:wrap;",
+          tags$span(style = "font-family:monospace; font-size:12px; color:#666;",
+                    e$date),
+          tags$span(
+            style = paste0("font-size:10px; letter-spacing:.06em;",
+                           " text-transform:uppercase; padding:1px 6px;",
+                           " border-radius:2px; background:", col, "22;",
+                           " color:", col, ";"),
+            POLICY_CATEGORY_LABELS[[e$category]]),
+          if (e$value_type == "scheduled") {
+            tags$span(style = "font-size:11px; color:#E8A33D;", "planlanan")
+          },
+          if (e$granularity == "year") {
+            tags$span(style = "font-size:11px; color:#888;", "yıl hassasiyeti")
+          }
+        ),
+        tags$div(style = "font-weight:600; font-size:13.5px; margin-top:3px;",
+                 e$title_tr),
+        tags$div(style = "font-size:12.5px; color:#666; margin-top:2px;",
+                 e$summary_tr),
+        tags$div(
+          style = "font-size:11px; color:#999; margin-top:4px;",
+          "Kaynak: ",
+          if (!is.na(e$source_url)) {
+            tags$a(href = e$source_url, target = "_blank", rel = "noopener",
+                   "bağlantı")
+          } else "—",
+          " · türetildiği dosya: ", tags$code(e$derived_from))
+      )
+    }
+
+    tagList(
+      # The honest header. This is the single most important thing on the panel.
+      tags$div(
+        style = paste0("padding:10px 12px; margin-bottom:14px;",
+                       " background:#FDECEA; border-left:4px solid #C0392B;",
+                       " font-size:12.5px;"),
+        tags$b("Bu takvim eksik ve eksikliği rastgele değil."),
+        " Buradaki ", nrow(ev), " olayın tamamı AB SKDM ve Türkiye ETS mevzuatı, ",
+        "ve tamamı ", tags$b("2023 ve sonrası"), ". Filo eğrisi 2000'de başlıyor, ",
+        "yani bu işaretler grafiğin sağ ucunda duruyor ve ",
+        tags$b("arkalarındaki eğriyi açıklamıyorlar"), " — 2015-2024 yenilenebilir ",
+        "atılımı bu mevzuatın hiçbiri yokken çoktan olmuştu.",
+        tags$br(), tags$br(),
+        "Eğriyi açıklayacak olan Türkiye enerji politikası — YEKDEM, kapasite ",
+        "mekanizması, kömür teşvikleri, lisans rejimi — burada ",
+        tags$b("yok"), ", çünkü açık ve makine okunur bir kütüğü yok; her madde ",
+        "birincil kaynaktan okunup kaynaklandırılmalı."
+      ),
+
+      lapply(seq_len(nrow(ev)), row_ui),
+
+      tags$p(
+        style = paste0("font-size:11.5px; color:#888; margin-top:12px;",
+                       " border-top:1px solid #eee; padding-top:10px;"),
+        "Hiçbir olay bu proje için yeniden araştırılmadı; hepsi ",
+        tags$code("policies/"), " altındaki mevcut parametre dosyalarından ",
+        "türetildi ve kaynağı taşındı. Solmuş satırlar slider'ın henüz ",
+        "ulaşmadığı yıllardır."
+      )
+    )
+  })
+
 
   output$fleet_coverage_panel <- renderUI({
     req(!is.null(fleet_coverage))
