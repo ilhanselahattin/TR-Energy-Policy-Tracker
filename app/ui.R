@@ -128,6 +128,29 @@ dashboardPage(
         inputId = "only_captive",
         label   = "Yalnızca kendi tesisini besleyen santraller",
         value   = FALSE
+      ),
+
+      # Ownership filter. "Kesin" restricts to chains whose final link to the
+      # plant is quantified — the filter that drops the ITC name collision.
+      selectInput(
+        inputId  = "ownership_filter",
+        label    = "Sahiplik",
+        choices  = c("Tümü"                          = "all",
+                     "AB27 merkezli sahibi olanlar"  = "eu",
+                     "AB27 — zinciri kesin olanlar"  = "eu_certain",
+                     "Yabancı sahibi olanlar"        = "foreign",
+                     "Yabancı — zinciri kesin"       = "foreign_certain",
+                     "Sahiplik kaydı olmayanlar"     = "unknown"),
+        selected = "all"
+      ),
+
+      selectInput(
+        inputId  = "route_filter",
+        label    = "Proses rotası",
+        choices  = c("Tümü" = "all",
+                     setNames(names(ROUTE_LABELS), unname(ROUTE_LABELS)),
+                     "Rotası bilinmeyen" = "none"),
+        selected = "all"
       )
     )
   ),
@@ -254,6 +277,12 @@ dashboardPage(
               title = "Emisyon Serisi — Seçili Kapsam",
               plotOutput("trend_plot", height = 220),
               uiOutput("trend_note")
+            ),
+            box(
+              width = NULL, status = "danger", solidHeader = TRUE,
+              title = "Sahiplik — Karbon Kimin Elinde",
+              collapsible = TRUE, collapsed = TRUE,
+              uiOutput("ownership_panel")
             ),
             box(
               width = NULL, status = "info", solidHeader = TRUE,

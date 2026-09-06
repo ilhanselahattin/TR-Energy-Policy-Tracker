@@ -75,6 +75,32 @@ facilities <- readRDS(FACILITIES_PATH)
 PANEL_PATH <- file.path(PROJECT_ROOT, "data", "processed", "facility_panel.rds")
 panel <- if (file.exists(PANEL_PATH)) readRDS(PANEL_PATH) else NULL
 
+# Ownership, from 05. Optional like every other enrichment: the app runs without
+# it and says so rather than failing.
+OWN_SUMMARY_PATH <- file.path(PROJECT_ROOT, "data", "processed",
+                              "ownership_summary.rds")
+OWN_PATH         <- file.path(PROJECT_ROOT, "data", "processed",
+                              "ownership.rds")
+OWN_BY_PARENT_PATH <- file.path(PROJECT_ROOT, "data", "processed",
+                                "ownership_by_parent.csv")
+
+ownership_summary <- if (file.exists(OWN_SUMMARY_PATH)) {
+  readRDS(OWN_SUMMARY_PATH)
+} else NULL
+
+ownership <- if (file.exists(OWN_PATH)) readRDS(OWN_PATH) else NULL
+
+ownership_by_parent <- if (file.exists(OWN_BY_PARENT_PATH)) {
+  utils::read.csv(OWN_BY_PARENT_PATH, fileEncoding = "UTF-8")
+} else NULL
+
+# TR-ETS threshold check, from 03.
+TR_ETS_PATH <- file.path(PROJECT_ROOT, "data", "processed",
+                         "tr_ets_coverage.csv")
+tr_ets_coverage <- if (file.exists(TR_ETS_PATH)) {
+  utils::read.csv(TR_ETS_PATH, fileEncoding = "UTF-8")
+} else NULL
+
 # Optional: the grid intensity comparison, if 01d has run. The app degrades
 # rather than failing when it is absent.
 GRID_PATH <- file.path(PROJECT_ROOT, "data", "processed", "grid_intensity.csv")
@@ -279,6 +305,15 @@ fmt_tr <- function(x, digits = 0) {
   format(round(x, digits), big.mark = ".", decimal.mark = ",",
          nsmall = digits, trim = TRUE, scientific = FALSE)
 }
+
+#' TRUE where a logical vector is TRUE, FALSE where it is NA.
+#'
+#' Ownership flags are deliberately NA for the 39 facilities with no parent
+#' record, because "no record" is not "Turkish-owned". Subsetting with a vector
+#' containing NA silently yields NA rows, which then propagate into a filter as
+#' phantom facilities. This makes the intent explicit at every call site that
+#' asks "is this flag true".
+isTRUE_vec <- function(x) !is.na(x) & x
 
 
 # =============================================================================
@@ -495,6 +530,49 @@ POLICY_VALUE_TYPE_LABELS <- c(
   "scheduled"  = "Planlanan",
   "assumption" = "Varsayım"
 )
+
+
+# =============================================================================
+# 8. PROCESS ROUTE AND OWNERSHIP VOCABULARY
+# =============================================================================
+# The route is the field the indirect-emissions argument turns on, so it gets a
+# colour of its own rather than being buried in a popup line. Electric routes
+# are drawn cool because their footprint moves with the grid; coke-based routes
+# warm because it does not.
+ROUTE_LABELS <- c(
+  "EAF"          = "Elektrik ark ocağı (EAF)",
+  "BF-BOF"       = "Yüksek fırın + konvertör",
+  "BF-BOF + EAF" = "Entegre — hem yüksek fırın hem EAF",
+  "dry kiln"     = "Kuru yöntem döner fırın"
+)
+
+ROUTE_COLOURS <- c(
+  "EAF"          = "#4CC9F0",
+  "BF-BOF"       = "#FF6B35",
+  "BF-BOF + EAF" = "#FFD166",
+  "dry kiln"     = "#B084F5"
+)
+
+ROUTE_NOTES <- c(
+  "EAF" = paste0(
+    "Hurdayı elektrikle eritir. Emisyonunun büyük kısmı DOLAYLIDIR ve ",
+    "tükettiği elektriğin karbon yoğunluğuyla birlikte hareket eder — yani ",
+    "şebeke temizlendikçe bu tesisin SKDM maruziyeti kendiliğinden düşer."),
+  "BF-BOF" = paste0(
+    "Cevheri kok kömürüyle indirger. Emisyonu DOĞRUDANDIR ve şebekeden ",
+    "bağımsızdır; şebekenin temizlenmesi bu tesisi kurtarmaz."),
+  "BF-BOF + EAF" = paste0(
+    "Entegre tesis: iki rotayı birlikte işletir, dolayısıyla maruziyeti ",
+    "kısmen şebekeye bağlı kısmen bağımsızdır."),
+  "dry kiln" = paste0(
+    "Çimentonun emisyonunun büyük kısmı kalsinasyondan gelir — kimyasal ",
+    "reaksiyonun kendisinden, yakıttan değil. Şebeke yoğunluğu bu tesiste ",
+    "çeliktekinden çok daha az belirleyicidir.")
+)
+
+# TR-ETS threshold, read from the policy file rather than repeated here.
+TR_ETS_THRESHOLD_T <- 50000
+
 
 FLEET_LABELS <- c(
   "hydropower"          = "Hidroelektrik",

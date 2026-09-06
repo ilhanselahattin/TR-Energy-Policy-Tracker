@@ -29,6 +29,32 @@ function(input, output, session) {
       out <- out |> filter(!is.na(is_captive), is_captive)
     }
 
+    # Ownership. The `_certain` variants restrict to chains whose final link to
+    # the facility is quantified — the same filter that drops the ITC Ltd name
+    # collision, and the difference between "53 foreign-owned" and "32".
+    if (!is.null(input$ownership_filter) && input$ownership_filter != "all" &&
+        !is.null(ownership_summary)) {
+      s <- ownership_summary
+      keep <- switch(
+        input$ownership_filter,
+        "eu"              = s$facility_id[isTRUE_vec(s$has_eu_parent)],
+        "eu_certain"      = s$facility_id[isTRUE_vec(s$has_eu_parent_certain)],
+        "foreign"         = s$facility_id[isTRUE_vec(s$has_foreign_parent)],
+        "foreign_certain" = s$facility_id[isTRUE_vec(s$has_foreign_parent_certain)],
+        "unknown"         = s$facility_id[!s$ownership_known],
+        s$facility_id
+      )
+      out <- out |> filter(facility_id %in% keep)
+    }
+
+    if (!is.null(input$route_filter) && input$route_filter != "all") {
+      out <- if (input$route_filter == "none") {
+        out |> filter(is.na(process_route))
+      } else {
+        out |> filter(!is.na(process_route), process_route == input$route_filter)
+      }
+    }
+
     out
   })
 
@@ -621,6 +647,136 @@ function(input, output, session) {
         }
       },
 
+      # --- Process route ------------------------------------------------------
+      # Given its own block rather than a table row, because for a steel plant
+      # this single field decides whether the grid tab is relevant to it at all.
+      if (!is.null(f$process_route) && !is.na(f$process_route)) {
+        col <- ROUTE_COLOURS[[f$process_route]]
+        tags$div(
+          style = paste0("margin-top:12px; padding:10px 12px;",
+                         " border-left:4px solid ", col, "; background:#fafafa;"),
+          tags$div(style = paste0("font-weight:600; font-size:13px; color:", col, ";"),
+                   ROUTE_LABELS[[f$process_route]]),
+          tags$div(style = "font-size:12px; color:#555; margin-top:4px;",
+                   ROUTE_NOTES[[f$process_route]]),
+
+          if (f$sector == "iron-and-steel" && !is.na(f$cap_crude_kt)) {
+            tags$div(
+              style = "font-size:12px; margin-top:6px; color:#666;",
+              tags$b("Kapasite: "), fmt_tr(f$cap_crude_kt), " kt ham çelik",
+              if (!is.na(f$cap_eaf_kt))
+                paste0(" · EAF ", fmt_tr(f$cap_eaf_kt), " kt"),
+              if (!is.na(f$cap_bof_kt))
+                paste0(" · BOF ", fmt_tr(f$cap_bof_kt), " kt")
+            )
+          },
+
+          if (f$sector == "cement" && !is.na(f$cap_clinker_mtpa)) {
+            tags$div(
+              style = "font-size:12px; margin-top:6px; color:#666;",
+              tags$b("Klinker kapasitesi: "),
+              fmt_tr(f$cap_clinker_mtpa, 1), " Mt/yıl",
+              if (!is.na(f$clinker_substitution))
+                tagList(tags$br(), tags$b("Klinker ikamesi: "),
+                        f$clinker_substitution,
+                        tags$span(style = "color:#999;",
+                                  " (GEM bunu bant/derece olarak yayımlar, oran olarak değil)"))
+            )
+          },
+
+          tags$div(style = "font-size:11px; color:#999; margin-top:6px;",
+                   "Kaynak: Global Energy Monitor, koordinat eşleştirmesiyle")
+        )
+      },
+
+      # --- TR-ETS threshold ---------------------------------------------------
+      if (!is.null(tr_ets_coverage) && f$asset_class == "industrial") {
+        e <- tr_ets_coverage[tr_ets_coverage$facility_id == selected_id(), ]
+        if (nrow(e) == 1) {
+          above <- isTRUE(e$above_threshold)
+          tags$div(
+            style = paste0("margin-top:12px; padding:8px 10px; font-size:12px;",
+                           " border-left:4px solid ",
+                           if (above) "#4C9A2A" else "#E8A33D",
+                           "; background:#fafafa;"),
+            tags$b(if (above) "TR-ETS eşiğinin üstünde" else
+                     "TR-ETS eşiğinin altında"),
+            " — ", e$year, " emisyonu ", fmt_tr(e$emissions_t / 1000, 1),
+            " kt, eşik ", fmt_tr(TR_ETS_THRESHOLD_T / 1000), " kt.",
+            tags$div(
+              style = "color:#999; margin-top:4px;",
+              "Yaklaşımdır: mevzuat eşiği ", tags$i("izinli yıllık emisyon ",
+              "kapasitesine"), " uygular, burada gerçekleşen emisyon ",
+              "karşılaştırılıyor."
+            )
+          )
+        }
+      },
+
+      # --- Ownership ----------------------------------------------------------
+      if (!is.null(ownership)) {
+        rows <- ownership[ownership$facility_id == selected_id(), ]
+        if (nrow(rows) == 0) {
+          tags$div(
+            style = paste0("margin-top:12px; padding:8px 10px; font-size:12px;",
+                           " background:#fafafa; color:#888;"),
+            tags$b("Sahiplik kaydı yok."), " Bu tesis için ana şirket ",
+            "yayımlanmamış — Türk sahipli sayılmadı, bilinmiyor olarak duruyor."
+          )
+        } else {
+          named <- rows[rows$is_named_entity, ]
+          named <- named[order(-named$path_terminal_unknown * 0 +
+                                 named$path_terminal_unknown,
+                               -coalesce(named$share_pct_unreliable, -1)), ]
+          tags$div(
+            style = "margin-top:12px; padding:10px 12px; background:#fafafa; border:1px solid #eee;",
+            tags$div(style = "font-size:12px; color:#666; margin-bottom:6px;",
+                     tags$b("Sahiplik zinciri"), " — ", nrow(rows), " kayıt, ",
+                     sum(rows$is_named_entity), " isimli şirket"),
+
+            if (nrow(named) > 0) {
+              tagList(lapply(seq_len(min(6, nrow(named))), function(i) {
+                r <- named[i, ]
+                unk <- isTRUE(r$path_terminal_unknown)
+                tags$div(
+                  style = paste0("font-size:12.5px; padding:3px 0;",
+                                 if (unk) " opacity:.55;" else ""),
+                  tags$span(style = "font-weight:600;", r$parent_name),
+                  if (!is.na(r$parent_hq_country))
+                    tags$span(style = "color:#888;", " · ", r$parent_hq_country),
+                  if (!is.na(r$share_pct_unreliable))
+                    tags$span(style = "color:#888;",
+                              " · %", round(r$share_pct_unreliable, 1)),
+                  if (unk)
+                    tags$span(style = "color:#C0392B; font-size:11px;",
+                              " · son halka nicelendirilmemiş")
+                )
+              }))
+            },
+
+            if (any(rows$is_eu)) {
+              tags$div(
+                style = paste0("margin-top:8px; padding:6px 8px; font-size:12px;",
+                               " background:#EAF2FA; border-left:3px solid #2166AC;"),
+                tags$b("AB27 merkezli bir sahibi var."),
+                if (any(rows$is_eu & !rows$path_terminal_unknown))
+                  " Zincirin son halkası nicelendirilmiş."
+                else
+                  tagList(" ", tags$span(style = "color:#C0392B;",
+                          "Ancak son halka nicelendirilmemiş — bu iddia zayıf."))
+              )
+            },
+
+            tags$div(
+              style = "font-size:11px; color:#999; margin-top:8px;",
+              "Paylar bir ", tags$b("yol çarpımıdır"), ", tesisin bölüşümü ",
+              "değil; tesis başına toplamları %342'ye kadar çıkar. ",
+              "Bu yüzden burada hiçbir sahiplik yüzdesi hesaplanmaz."
+            )
+          )
+        }
+      },
+
       # The field the whole merge turns on, spelled out rather than coded.
       tags$div(
         style = "margin-top:12px; padding:8px 10px; background:#f5f5f5; font-size:12px;",
@@ -656,6 +812,110 @@ function(input, output, session) {
   # Surfacing these is a deliberate choice. A tool that shows 300 confident dots
   # and hides that 80 of them sit on or beyond a border is overstating what it
   # knows (§8.4).
+
+  # --- ownership overview -----------------------------------------------------
+  # Counts of facilities, never shares. Each claim is shown at both strengths so
+  # the reader sees the uncertainty rather than a single confident number.
+
+  output$ownership_panel <- renderUI({
+    if (is.null(ownership_summary)) {
+      return(tags$p(style = "font-size:13px; color:#888;",
+                    "Sahiplik katmanı üretilmedi. Çalıştırın: ",
+                    tags$code("Rscript scripts/05_build_ownership.R")))
+    }
+
+    ids <- selected_facilities()$facility_id
+    s   <- ownership_summary[ownership_summary$facility_id %in% ids, ]
+    if (nrow(s) == 0) return(tags$p("Seçili tesis yok."))
+
+    known <- sum(s$ownership_known)
+
+    stat <- function(label, any_n, certain_n, colour) {
+      tags$div(
+        style = "margin-bottom:10px;",
+        tags$div(style = "display:flex; justify-content:space-between; font-size:13px;",
+                 tags$span(label),
+                 tags$span(style = "font-weight:600;",
+                           any_n, " / ", tags$span(style = paste0("color:", colour, ";"),
+                                                   certain_n))),
+        tags$div(style = "background:#e6eaec; height:6px; border-radius:2px;",
+                 tags$div(style = paste0("background:", colour, "; height:6px;",
+                                         " border-radius:2px; width:",
+                                         if (known > 0) round(100*certain_n/known) else 0,
+                                         "%;")))
+      )
+    }
+
+    tagList(
+      tags$p(style = "font-size:13px; margin:0 0 12px;",
+             tags$b(known), " / ", nrow(s), " tesiste ana şirket kaydı var. ",
+             tags$span(style = "color:#888;",
+                       "Kaydı olmayan ", nrow(s) - known,
+                       " tesis Türk sahipli sayılmadı — bilinmiyor.")),
+
+      stat("AB27 merkezli sahibi olan",
+           sum(isTRUE_vec(s$has_eu_parent)),
+           sum(isTRUE_vec(s$has_eu_parent_certain)), "#2166AC"),
+      stat("Yabancı sahibi olan",
+           sum(isTRUE_vec(s$has_foreign_parent)),
+           sum(isTRUE_vec(s$has_foreign_parent_certain)), "#C0392B"),
+
+      tags$p(
+        style = paste0("font-size:12px; color:#666; margin-top:4px;",
+                       " border-top:1px solid #eee; padding-top:10px;"),
+        tags$b("İki sayı, iki güç. "), "Soldaki herhangi bir sahiplik zinciri, ",
+        "sağdaki ", tags$b("son halkası nicelendirilmiş"), " olanlar. Aradaki ",
+        "fark, tesise giden bağın payı bilinmeyen zincirlerdir — ve isim ",
+        "çakışmalarının saklandığı yer orası."
+      ),
+
+      if (!is.null(ownership_by_parent)) {
+        top <- head(ownership_by_parent[ownership_by_parent$facilities_certain > 0, ], 8)
+        tagList(
+          tags$div(style = "font-weight:600; font-size:13px; margin-top:14px;",
+                   "En çok tesise sahip şirketler"),
+          tags$div(style = "font-size:11px; color:#888; margin-bottom:6px;",
+                   "Zinciri kesin olan tesis sayısına göre sıralı"),
+          # The list mixes two different things and the data cannot separate
+          # them: a cement group that runs its plants, and an index fund that
+          # holds shares in a listed company that runs them. `parent_entity_type`
+          # says "legal entity" for both. Naming the ambiguity is honest;
+          # inventing a classifier for it would not be.
+          tags$div(
+            style = paste0("font-size:11px; color:#C0392B; margin-bottom:8px;",
+                           " padding:5px 7px; background:#FDECEA;"),
+            tags$b("Bu liste iki farklı şeyi karıştırıyor"), " ve veri onları ",
+            "ayıramıyor: tesisi ", tags$i("işleten"), " sanayi grubu ile o ",
+            "gruba ", tags$i("hisse tutan"), " fon aynı alanda ",
+            "\"legal entity\" olarak geçiyor. BlackRock ve Vanguard portföy ",
+            "yatırımcısıdır; Heidelberg ve Çimsa işletmecidir. Ayrımı biz ",
+            "uydurmadık, çünkü kaynak yapmıyor."),
+          tags$table(
+            style = "width:100%; font-size:12.5px;",
+            lapply(seq_len(nrow(top)), function(i) {
+              tags$tr(
+                tags$td(style = "padding:3px 0;", top$parent_name[i]),
+                tags$td(style = "text-align:right; color:#888; width:44px;",
+                        top$parent_hq_country[i]),
+                tags$td(style = "text-align:right; font-weight:600; width:34px;",
+                        top$facilities_certain[i])
+              )
+            })
+          )
+        )
+      },
+
+      tags$p(
+        style = "font-size:11.5px; color:#999; margin-top:12px;",
+        tags$b("Burada hiçbir yüzde yok, ve bu kasıtlı. "),
+        "Climate TRACE'in pay alanı bir yol çarpımıdır, tesisin bölüşümü ",
+        "değil — tesis başına toplamları %342'ye çıkıyor. Emisyonu bu paya ",
+        "göre ağırlıklandırmak, pay gibi davranmayan bir büyüklükle aritmetik ",
+        "yapmak olurdu."
+      )
+    )
+  })
+
 
   output$geocode_summary <- renderUI({
     df <- selected_facilities()
