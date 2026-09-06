@@ -112,16 +112,16 @@ function(input, output, session) {
     yr <- current_year()
     vt <- if (year_is_projected()) "projected" else "observed"
 
-    badge_bg <- if (vt == "projected") "#7B1FA2" else "#4C9A2A"
+    badge_bg <- if (vt == "projected") "var(--projected)" else "var(--good)"
     depth    <- year_depth_note(yr)
 
     tags$div(
-      style = "margin-top:-8px; font-size:12px; color:#c8d0d4;",
+      style = "margin-top:-8px; font-size:12px; color:var(--ink-soft);",
       tags$span(class = "yr-badge",
-                style = paste0("background:", badge_bg, "; color:#fff;"),
+                style = paste0("background:", badge_bg, "; color:#06090B;"),
                 unname(VALUE_TYPE_LABELS[vt])),
       if (!is.null(depth)) {
-        tags$span(style = "margin-left:6px; color:#E8A33D;", depth)
+        tags$span(style = "margin-left:6px; color:var(--warn);", depth)
       }
     )
   })
@@ -335,7 +335,7 @@ function(input, output, session) {
                         " kt ", unname(GAS_LABELS[gas_basis]))),
           ifelse(is.na(value_type), "",
                  paste0(" <span style='color:",
-                        ifelse(value_type == "projected", "#7B1FA2", "#4C9A2A"),
+                        ifelse(value_type == "projected", "var(--projected)", "var(--good)"),
                         ";'>(", unname(VALUE_TYPE_LABELS[value_type]), ")</span>")),
           "<br/>",
 
@@ -413,7 +413,7 @@ function(input, output, session) {
           ifelse(is.na(commissioning_year), "bilinmiyor", commissioning_year), "<br/>",
           "<b>İl:</b> ", province_name_tr, "<br/>",
           "<b>Kaynak:</b> Global Energy Monitor<br/><br/>",
-          "<span style='color:#666;'>Bu tesis modellenen 300 kaydın parçası ",
+          "<span style='color:var(--ink-soft);'>Bu tesis modellenen 300 kaydın parçası ",
           "değildir. Emisyon üretmediği için emisyon tablolarında yer almaz; ",
           "haritada, Climate TRACE'in elektrik kütüğünün göremediği üretimi ",
           "göstermek için bulunur.</span>"
@@ -450,13 +450,15 @@ function(input, output, session) {
   output$trend_plot <- renderPlot({
     s <- trend_series()
     if (is.null(s) || nrow(s) == 0) {
+      op <- plot_theme(mar = c(0, 0, 0, 0))
+      on.exit(par(op), add = TRUE)
       plot.new()
-      text(0.5, 0.5, "Seçili tesis yok", col = "#888", cex = 1.1)
+      text(0.5, 0.5, "Seçili tesis yok", col = PLOT_FAINT, cex = 1.1)
       return(invisible(NULL))
     }
 
-    op <- par(mar = c(3.2, 4.0, 0.6, 4.0), cex.axis = 0.8, cex.lab = 0.85,
-              mgp = c(2.3, 0.6, 0), tcl = -0.25, las = 1)
+    op <- plot_theme(mar = c(3.2, 4.0, 0.6, 4.0), cex.axis = 0.8, cex.lab = 0.85,
+                     mgp = c(2.3, 0.6, 0), tcl = -0.25, las = 1)
     on.exit(par(op), add = TRUE)
 
     yrs <- sort(unique(s$year))
@@ -470,8 +472,8 @@ function(input, output, session) {
         plot(d$year, d$mt, type = "n", xlab = "", ylab = "",
              xlim = range(yrs), ylim = c(0, max(d$mt) * 1.15),
              xaxt = "n", yaxt = "n", bty = "n")
-        axis(1, at = yrs, labels = yrs, col = "#ccc", col.axis = "#555")
-        grid(nx = NA, ny = NULL, col = "#eee", lty = 1)
+        axis(1, at = yrs, labels = yrs, col = PLOT_AXIS, col.axis = PLOT_SOFT)
+        grid(nx = NA, ny = NULL, col = PLOT_RULE, lty = 1)
       } else {
         par(new = TRUE)
         plot(d$year, d$mt, type = "n", xlab = "", ylab = "",
@@ -497,7 +499,7 @@ function(input, output, session) {
         lines(bridge$year, bridge$mt, col = colour, lwd = 2.0, lty = 2)
         # Hollow points for projections: a different shape as well as a
         # different line, because line style alone is easy to miss.
-        points(proj$year, proj$mt, col = colour, pch = 21, bg = "white",
+        points(proj$year, proj$mt, col = colour, pch = 21, bg = PLOT_BG,
                cex = 1.0, lwd = 1.8)
       }
 
@@ -505,28 +507,30 @@ function(input, output, session) {
       part <- d[!is.na(d$months) & d$months < 12, ]
       if (nrow(part) > 0) {
         text(part$year, part$mt, labels = paste0(part$months, "a"),
-             pos = 3, col = "#E8A33D", cex = 0.75, font = 2)
+             pos = 3, col = "#FF9F1C", cex = 0.75, font = 2)
       }
     }
 
     first <- TRUE
     for (b in c("co2", "co2e_100yr")) {
       if (any(s$gas_basis == b)) {
-        draw_one(b, if (b == "co2") "#B2182B" else "#2166AC",
-                 if (first) 2 else 4, first)
+        draw_one(b, unname(GAS_COLOURS[b]), if (first) 2 else 4, first)
         first <- FALSE
       }
     }
 
-    abline(v = current_year(), col = "#33333355", lwd = 1.5, lty = 3)
-  })
+    abline(v = current_year(), col = paste0(PLOT_SOFT, "66"), lwd = 1.5, lty = 3)
+  # The device itself is opened dark. par(bg=) alone is not enough: the margins
+  # outside the plot region keep the device background, so a white device shows
+  # a white frame around a dark panel.
+  }, bg = PLOT_BG)
 
   output$trend_note <- renderUI({
     s <- trend_series()
     if (is.null(s) || nrow(s) == 0) return(NULL)
 
     tags$p(
-      style = "font-size:12px; color:#666; margin:8px 0 0 0;",
+      style = "font-size:12px; color:var(--ink-soft); margin:8px 0 0 0;",
       tags$b("İki ayrı eksen, iki ayrı gaz."), " Sol eksen sanayi CO₂, sağ ",
       "eksen enerji CO₂e. Eğriler aynı grafikte ama ",
       tags$b("aynı ölçekte değildir"), " ve toplanmaz. ",
@@ -557,14 +561,14 @@ function(input, output, session) {
 
   output$facility_detail <- renderUI({
     if (is.null(selected_id())) {
-      return(tags$p(style = "color:#888;",
+      return(tags$p(style = "color:var(--ink-faint);",
                     "Ayrıntı için haritadan bir tesis seçin."))
     }
 
     f <- facilities |> filter(facility_id == selected_id())
 
     row <- function(label, value) {
-      tags$tr(tags$td(style = "color:#666; white-space:nowrap;", label),
+      tags$tr(tags$td(style = "color:var(--ink-soft); white-space:nowrap;", label),
               tags$td(style = "font-weight:600;", value))
     }
 
@@ -572,7 +576,7 @@ function(input, output, session) {
       tags$h4(f$facility_name_tr, style = "margin-top:0;"),
       tags$span(
         style = paste0("background:", SECTOR_COLOURS[[f$sector]],
-                       "; color:#fff; padding:2px 8px; border-radius:3px;",
+                       "; color:#06090B; padding:2px 8px; border-radius:3px;",
                        " font-size:12px;"),
         SECTOR_LABELS[[f$sector]]
       ),
@@ -600,23 +604,23 @@ function(input, output, session) {
       if (!is.null(panel)) {
         p <- panel |> filter(facility_id == selected_id(), year == current_year())
         if (nrow(p) == 0) {
-          tags$p(style = "font-size:12px; color:#888; margin-top:10px;",
+          tags$p(style = "font-size:12px; color:var(--ink-faint); margin-top:10px;",
                  current_year(), " için panel kaydı yok.")
         } else {
           tags$div(
-            style = paste0("margin-top:12px; padding:10px; background:#fafafa;",
-                           " border:1px solid #eee;"),
+            style = paste0("margin-top:12px; padding:10px; background:var(--surface-2);",
+                           " border:1px solid var(--rule);"),
             tags$div(
-              style = "font-size:12px; color:#666; margin-bottom:6px;",
+              style = "font-size:12px; color:var(--ink-soft); margin-bottom:6px;",
               tags$b(current_year()),
               tags$span(class = "yr-badge",
                         style = paste0("margin-left:6px; background:",
                                        if (p$value_type == "projected")
-                                         "#7B1FA2" else "#4C9A2A",
-                                       "; color:#fff;"),
+                                         "var(--projected)" else "var(--good)",
+                                       "; color:#06090B;"),
                         unname(VALUE_TYPE_LABELS[p$value_type])),
               if (!is.na(p$months_covered) && p$months_covered < 12)
-                tags$span(style = "margin-left:6px; color:#E8A33D;",
+                tags$span(style = "margin-left:6px; color:var(--warn);",
                           paste0(p$months_covered, "/12 ay"))
             ),
             tags$table(
@@ -638,7 +642,7 @@ function(input, output, session) {
               row("Sürüm", p$vintage)
             ),
             tags$p(
-              style = "font-size:11px; color:#888; margin:8px 0 0 0;",
+              style = "font-size:11px; color:var(--ink-faint); margin:8px 0 0 0;",
               tags$b("SKDM maruziyeti hesaplanmıyor."), " Doğrudan/dolaylı ",
               "ayrıştırma yapılmadan bu tesise bir maliyet baskısı rakamı ",
               "atanamaz; boş bırakmak, uydurmaktan iyidir."
@@ -654,15 +658,15 @@ function(input, output, session) {
         col <- ROUTE_COLOURS[[f$process_route]]
         tags$div(
           style = paste0("margin-top:12px; padding:10px 12px;",
-                         " border-left:4px solid ", col, "; background:#fafafa;"),
+                         " border-left:4px solid ", col, "; background:var(--surface-2);"),
           tags$div(style = paste0("font-weight:600; font-size:13px; color:", col, ";"),
                    ROUTE_LABELS[[f$process_route]]),
-          tags$div(style = "font-size:12px; color:#555; margin-top:4px;",
+          tags$div(style = "font-size:12px; color:var(--ink-soft); margin-top:4px;",
                    ROUTE_NOTES[[f$process_route]]),
 
           if (f$sector == "iron-and-steel" && !is.na(f$cap_crude_kt)) {
             tags$div(
-              style = "font-size:12px; margin-top:6px; color:#666;",
+              style = "font-size:12px; margin-top:6px; color:var(--ink-soft);",
               tags$b("Kapasite: "), fmt_tr(f$cap_crude_kt), " kt ham çelik",
               if (!is.na(f$cap_eaf_kt))
                 paste0(" · EAF ", fmt_tr(f$cap_eaf_kt), " kt"),
@@ -673,18 +677,18 @@ function(input, output, session) {
 
           if (f$sector == "cement" && !is.na(f$cap_clinker_mtpa)) {
             tags$div(
-              style = "font-size:12px; margin-top:6px; color:#666;",
+              style = "font-size:12px; margin-top:6px; color:var(--ink-soft);",
               tags$b("Klinker kapasitesi: "),
               fmt_tr(f$cap_clinker_mtpa, 1), " Mt/yıl",
               if (!is.na(f$clinker_substitution))
                 tagList(tags$br(), tags$b("Klinker ikamesi: "),
                         f$clinker_substitution,
-                        tags$span(style = "color:#999;",
+                        tags$span(style = "color:var(--ink-faint);",
                                   " (GEM bunu bant/derece olarak yayımlar, oran olarak değil)"))
             )
           },
 
-          tags$div(style = "font-size:11px; color:#999; margin-top:6px;",
+          tags$div(style = "font-size:11px; color:var(--ink-faint); margin-top:6px;",
                    "Kaynak: Global Energy Monitor, koordinat eşleştirmesiyle")
         )
       },
@@ -697,14 +701,14 @@ function(input, output, session) {
           tags$div(
             style = paste0("margin-top:12px; padding:8px 10px; font-size:12px;",
                            " border-left:4px solid ",
-                           if (above) "#4C9A2A" else "#E8A33D",
-                           "; background:#fafafa;"),
+                           if (above) "var(--good)" else "var(--warn)",
+                           "; background:var(--surface-2);"),
             tags$b(if (above) "TR-ETS eşiğinin üstünde" else
                      "TR-ETS eşiğinin altında"),
             " — ", e$year, " emisyonu ", fmt_tr(e$emissions_t / 1000, 1),
             " kt, eşik ", fmt_tr(TR_ETS_THRESHOLD_T / 1000), " kt.",
             tags$div(
-              style = "color:#999; margin-top:4px;",
+              style = "color:var(--ink-faint); margin-top:4px;",
               "Yaklaşımdır: mevzuat eşiği ", tags$i("izinli yıllık emisyon ",
               "kapasitesine"), " uygular, burada gerçekleşen emisyon ",
               "karşılaştırılıyor."
@@ -719,7 +723,7 @@ function(input, output, session) {
         if (nrow(rows) == 0) {
           tags$div(
             style = paste0("margin-top:12px; padding:8px 10px; font-size:12px;",
-                           " background:#fafafa; color:#888;"),
+                           " background:var(--surface-2); color:var(--ink-faint);"),
             tags$b("Sahiplik kaydı yok."), " Bu tesis için ana şirket ",
             "yayımlanmamış — Türk sahipli sayılmadı, bilinmiyor olarak duruyor."
           )
@@ -729,8 +733,8 @@ function(input, output, session) {
                                  named$path_terminal_unknown,
                                -coalesce(named$share_pct_unreliable, -1)), ]
           tags$div(
-            style = "margin-top:12px; padding:10px 12px; background:#fafafa; border:1px solid #eee;",
-            tags$div(style = "font-size:12px; color:#666; margin-bottom:6px;",
+            style = "margin-top:12px; padding:10px 12px; background:var(--surface-2); border:1px solid var(--rule);",
+            tags$div(style = "font-size:12px; color:var(--ink-soft); margin-bottom:6px;",
                      tags$b("Sahiplik zinciri"), " — ", nrow(rows), " kayıt, ",
                      sum(rows$is_named_entity), " isimli şirket"),
 
@@ -740,15 +744,17 @@ function(input, output, session) {
                 unk <- isTRUE(r$path_terminal_unknown)
                 tags$div(
                   style = paste0("font-size:12.5px; padding:3px 0;",
-                                 if (unk) " opacity:.55;" else ""),
+                                 # Same recalibration as the policy calendar:
+                                 # .55 was legible on white, not on this ground.
+                                 if (unk) " opacity:.7;" else ""),
                   tags$span(style = "font-weight:600;", r$parent_name),
                   if (!is.na(r$parent_hq_country))
-                    tags$span(style = "color:#888;", " · ", r$parent_hq_country),
+                    tags$span(style = "color:var(--ink-faint);", " · ", r$parent_hq_country),
                   if (!is.na(r$share_pct_unreliable))
-                    tags$span(style = "color:#888;",
+                    tags$span(style = "color:var(--ink-faint);",
                               " · %", round(r$share_pct_unreliable, 1)),
                   if (unk)
-                    tags$span(style = "color:#C0392B; font-size:11px;",
+                    tags$span(style = "color:var(--bad); font-size:11px;",
                               " · son halka nicelendirilmemiş")
                 )
               }))
@@ -757,18 +763,18 @@ function(input, output, session) {
             if (any(rows$is_eu)) {
               tags$div(
                 style = paste0("margin-top:8px; padding:6px 8px; font-size:12px;",
-                               " background:#EAF2FA; border-left:3px solid #2166AC;"),
+                               " background:#0B1B24; border-left:3px solid var(--info);"),
                 tags$b("AB27 merkezli bir sahibi var."),
                 if (any(rows$is_eu & !rows$path_terminal_unknown))
                   " Zincirin son halkası nicelendirilmiş."
                 else
-                  tagList(" ", tags$span(style = "color:#C0392B;",
+                  tagList(" ", tags$span(style = "color:var(--bad);",
                           "Ancak son halka nicelendirilmemiş — bu iddia zayıf."))
               )
             },
 
             tags$div(
-              style = "font-size:11px; color:#999; margin-top:8px;",
+              style = "font-size:11px; color:var(--ink-faint); margin-top:8px;",
               "Paylar bir ", tags$b("yol çarpımıdır"), ", tesisin bölüşümü ",
               "değil; tesis başına toplamları %342'ye kadar çıkar. ",
               "Bu yüzden burada hiçbir sahiplik yüzdesi hesaplanmaz."
@@ -779,15 +785,15 @@ function(input, output, session) {
 
       # The field the whole merge turns on, spelled out rather than coded.
       tags$div(
-        style = "margin-top:12px; padding:8px 10px; background:#f5f5f5; font-size:12px;",
+        style = "margin-top:12px; padding:8px 10px; background:var(--surface-2); font-size:12px;",
         tags$b("Yükümlülük sınıfı: "),
         LIABILITY_LABELS[[f$liability_class]]
       ),
 
       if (!is.na(f$is_captive) && f$is_captive) {
         tags$div(
-          style = paste0("margin-top:8px; padding:8px 10px; background:#FFF3E0;",
-                         " border-left:4px solid #E8A33D; font-size:12px;"),
+          style = paste0("margin-top:8px; padding:8px 10px; background:#1C1608;",
+                         " border-left:4px solid var(--warn); font-size:12px;"),
           tags$b("Kendi tesisini besleyen santral"),
           if (!is.na(f$captive_industry))
             paste0(" — ", f$captive_industry), ". ",
@@ -798,7 +804,7 @@ function(input, output, session) {
 
       tags$div(
         style = paste0("margin-top:12px; padding:8px 10px; border-left:4px solid ",
-                       GEOCODE_BADGE[[f$geocode_quality]], "; background:#fafafa;",
+                       GEOCODE_BADGE[[f$geocode_quality]], "; background:var(--surface-2);",
                        " font-size:12px;"),
         tags$b("Konum ataması: "), GEOCODE_LABELS[[f$geocode_quality]]
       )
@@ -819,7 +825,7 @@ function(input, output, session) {
 
   output$ownership_panel <- renderUI({
     if (is.null(ownership_summary)) {
-      return(tags$p(style = "font-size:13px; color:#888;",
+      return(tags$p(style = "font-size:13px; color:var(--ink-faint);",
                     "Sahiplik katmanı üretilmedi. Çalıştırın: ",
                     tags$code("Rscript scripts/05_build_ownership.R")))
     }
@@ -838,7 +844,7 @@ function(input, output, session) {
                  tags$span(style = "font-weight:600;",
                            any_n, " / ", tags$span(style = paste0("color:", colour, ";"),
                                                    certain_n))),
-        tags$div(style = "background:#e6eaec; height:6px; border-radius:2px;",
+        tags$div(style = "background:var(--surface-3); height:6px; border-radius:2px;",
                  tags$div(style = paste0("background:", colour, "; height:6px;",
                                          " border-radius:2px; width:",
                                          if (known > 0) round(100*certain_n/known) else 0,
@@ -849,20 +855,20 @@ function(input, output, session) {
     tagList(
       tags$p(style = "font-size:13px; margin:0 0 12px;",
              tags$b(known), " / ", nrow(s), " tesiste ana şirket kaydı var. ",
-             tags$span(style = "color:#888;",
+             tags$span(style = "color:var(--ink-faint);",
                        "Kaydı olmayan ", nrow(s) - known,
                        " tesis Türk sahipli sayılmadı — bilinmiyor.")),
 
       stat("AB27 merkezli sahibi olan",
            sum(isTRUE_vec(s$has_eu_parent)),
-           sum(isTRUE_vec(s$has_eu_parent_certain)), "#2166AC"),
+           sum(isTRUE_vec(s$has_eu_parent_certain)), "var(--info)"),
       stat("Yabancı sahibi olan",
            sum(isTRUE_vec(s$has_foreign_parent)),
-           sum(isTRUE_vec(s$has_foreign_parent_certain)), "#C0392B"),
+           sum(isTRUE_vec(s$has_foreign_parent_certain)), "var(--bad)"),
 
       tags$p(
-        style = paste0("font-size:12px; color:#666; margin-top:4px;",
-                       " border-top:1px solid #eee; padding-top:10px;"),
+        style = paste0("font-size:12px; color:var(--ink-soft); margin-top:4px;",
+                       " border-top:1px solid var(--rule); padding-top:10px;"),
         tags$b("İki sayı, iki güç. "), "Soldaki herhangi bir sahiplik zinciri, ",
         "sağdaki ", tags$b("son halkası nicelendirilmiş"), " olanlar. Aradaki ",
         "fark, tesise giden bağın payı bilinmeyen zincirlerdir — ve isim ",
@@ -874,7 +880,7 @@ function(input, output, session) {
         tagList(
           tags$div(style = "font-weight:600; font-size:13px; margin-top:14px;",
                    "En çok tesise sahip şirketler"),
-          tags$div(style = "font-size:11px; color:#888; margin-bottom:6px;",
+          tags$div(style = "font-size:11px; color:var(--ink-faint); margin-bottom:6px;",
                    "Zinciri kesin olan tesis sayısına göre sıralı"),
           # The list mixes two different things and the data cannot separate
           # them: a cement group that runs its plants, and an index fund that
@@ -882,8 +888,8 @@ function(input, output, session) {
           # says "legal entity" for both. Naming the ambiguity is honest;
           # inventing a classifier for it would not be.
           tags$div(
-            style = paste0("font-size:11px; color:#C0392B; margin-bottom:8px;",
-                           " padding:5px 7px; background:#FDECEA;"),
+            style = paste0("font-size:11px; color:var(--bad); margin-bottom:8px;",
+                           " padding:5px 7px; background:#231014;"),
             tags$b("Bu liste iki farklı şeyi karıştırıyor"), " ve veri onları ",
             "ayıramıyor: tesisi ", tags$i("işleten"), " sanayi grubu ile o ",
             "gruba ", tags$i("hisse tutan"), " fon aynı alanda ",
@@ -895,7 +901,7 @@ function(input, output, session) {
             lapply(seq_len(nrow(top)), function(i) {
               tags$tr(
                 tags$td(style = "padding:3px 0;", top$parent_name[i]),
-                tags$td(style = "text-align:right; color:#888; width:44px;",
+                tags$td(style = "text-align:right; color:var(--ink-faint); width:44px;",
                         top$parent_hq_country[i]),
                 tags$td(style = "text-align:right; font-weight:600; width:34px;",
                         top$facilities_certain[i])
@@ -906,7 +912,7 @@ function(input, output, session) {
       },
 
       tags$p(
-        style = "font-size:11.5px; color:#999; margin-top:12px;",
+        style = "font-size:11.5px; color:var(--ink-faint); margin-top:12px;",
         tags$b("Burada hiçbir yüzde yok, ve bu kasıtlı. "),
         "Climate TRACE'in pay alanı bir yol çarpımıdır, tesisin bölüşümü ",
         "değil — tesis başına toplamları %342'ye çıkıyor. Emisyonu bu paya ",
@@ -937,7 +943,7 @@ function(input, output, session) {
         })
       ),
       tags$p(
-        style = "margin-top:10px; font-size:12px; color:#666;",
+        style = "margin-top:10px; font-size:12px; color:var(--ink-soft);",
         "İl sınırları Natural Earth 10m katmanından türetilmiştir. Bu ",
         "çözünürlük, il sınırına çok yakın veya kıyı dolgusu üzerindeki ",
         "tesisleri kesin olarak ayırt edemez. Tesis bazında mesafeler ",
@@ -967,7 +973,7 @@ function(input, output, session) {
         })
       ),
       tags$p(
-        style = "margin-top:10px; font-size:12px; color:#666;",
+        style = "margin-top:10px; font-size:12px; color:var(--ink-soft);",
         "Devreye giriş yılı Global Energy Monitor'den, koordinat yakınlığıyla ",
         "eşleştirilerek alınmıştır — Climate TRACE 2021'de başlar ve bu alanı ",
         "taşımaz. Yılı bilinmeyen tesisler, 2021 öncesi filo animasyonundan ",
@@ -1006,16 +1012,16 @@ function(input, output, session) {
           )
         }),
         tags$tr(
-          tags$td(style = "padding-top:8px; border-top:1px solid #ddd;",
+          tags$td(style = "padding-top:8px; border-top:1px solid var(--rule);",
                   tags$b("Toplam")),
-          tags$td(style = "text-align:right; padding-top:8px; border-top:1px solid #ddd;",
+          tags$td(style = "text-align:right; padding-top:8px; border-top:1px solid var(--rule);",
                   tags$b(nrow(fleet_renewables))),
-          tags$td(style = "text-align:right; padding-top:8px; border-top:1px solid #ddd;",
+          tags$td(style = "text-align:right; padding-top:8px; border-top:1px solid var(--rule);",
                   tags$b(paste0(round(sum(by_fuel$gw), 1), " GW")))
         )
       ),
       tags$p(
-        style = "margin-top:10px; font-size:12px; color:#666;",
+        style = "margin-top:10px; font-size:12px; color:var(--ink-soft);",
         tags$b("Bu tesisler modellenen 300 kaydın parçası değildir. "),
         "Global Energy Monitor'den gelirler, emisyon üretmezler ve emisyon ",
         "tablolarında yer almazlar. Haritada bulunma sebepleri tek bir soruyu ",
@@ -1086,10 +1092,10 @@ function(input, output, session) {
     req(!is.null(fleet_timeline))
     v <- fleet_visible()
     tags$p(
-      style = "margin:-6px 0 0; font-size:12.5px; color:#c8d0d4;",
+      style = "margin:-6px 0 0; font-size:12.5px; color:var(--ink-soft);",
       tags$b(fleet_year()), " itibarıyla devreye alınmış: ",
       tags$b(fmt_tr(nrow(v$arrived))), " tesis. ",
-      tags$span(style = "color:#E8A33D;",
+      tags$span(style = "color:var(--warn);",
                 fmt_tr(nrow(v$undated)),
                 " tesis tarihsiz ve hiçbir yıla ait değil."),
       if (nrow(v$later) > 0) {
@@ -1253,8 +1259,8 @@ function(input, output, session) {
     mw_col <- if (mode == "cum") "cum_mw" else "added_mw"
     n_col  <- if (mode == "cum") "cum_n"  else "added_n"
 
-    op <- par(mar = c(3.0, 4.2, 0.6, 4.2), cex.axis = .8, cex.lab = .85,
-              mgp = c(2.4, .6, 0), tcl = -.25, las = 1)
+    op <- plot_theme(mar = c(3.0, 4.2, 0.6, 4.2), cex.axis = .8, cex.lab = .85,
+                     mgp = c(2.4, .6, 0), tcl = -.25, las = 1)
     on.exit(par(op), add = TRUE)
 
     mw_groups <- tl[tl$group %in% TL_HAS_MW, ]
@@ -1262,12 +1268,12 @@ function(input, output, session) {
 
     plot(NA, xlim = range(yrs), ylim = c(0, ymax * 1.08),
          xlab = "", ylab = "", xaxt = "n", yaxt = "n", bty = "n")
-    axis(1, at = seq(min(yrs), max(yrs), by = 4), col = "#ccc", col.axis = "#555")
+    axis(1, at = seq(min(yrs), max(yrs), by = 4), col = PLOT_AXIS, col.axis = PLOT_SOFT)
     axis(2, at = pretty(c(0, ymax)), labels = pretty(c(0, ymax)) / 1000,
-         col = "#888", col.axis = "#555")
+         col = PLOT_AXIS, col.axis = PLOT_SOFT)
     mtext(if (mode == "cum") "Kümülatif GW" else "Yıllık eklenen GW",
-          side = 2, line = 2.7, cex = .8, col = "#555")
-    grid(nx = NA, ny = NULL, col = "#eee", lty = 1)
+          side = 2, line = 2.7, cex = .8, col = PLOT_SOFT)
+    grid(nx = NA, ny = NULL, col = PLOT_RULE, lty = 1)
 
     # The national reference. Dotted, neutral, and only on the cumulative view:
     # Ember publishes a stock, so comparing it with annual additions would be a
@@ -1292,9 +1298,9 @@ function(input, output, session) {
     nmax <- max(tl[[n_col]], na.rm = TRUE)
     plot(NA, xlim = range(yrs), ylim = c(0, nmax * 1.08),
          axes = FALSE, xlab = "", ylab = "", bty = "n")
-    axis(4, col = "#888", col.axis = "#555")
+    axis(4, col = PLOT_AXIS, col.axis = PLOT_SOFT)
     mtext(if (mode == "cum") "Kümülatif tesis sayısı" else "Yıllık eklenen tesis",
-          side = 4, line = 2.9, cex = .8, col = "#555")
+          side = 4, line = 2.9, cex = .8, col = PLOT_SOFT)
 
     for (g in names(TL_LABELS)) {
       d <- tl[tl$group == g, ]
@@ -1325,12 +1331,12 @@ function(input, output, session) {
       }
     }
 
-    abline(v = fleet_year(), col = "#33333366", lwd = 1.5, lty = 3)
-  })
+    abline(v = fleet_year(), col = paste0(PLOT_SOFT, "66"), lwd = 1.5, lty = 3)
+  }, bg = PLOT_BG)
 
   output$fleet_plot_note <- renderUI({
     tags$p(
-      style = "font-size:12px; color:#666; margin:8px 0 0;",
+      style = "font-size:12px; color:var(--ink-soft); margin:8px 0 0;",
       tags$b("Kalın düz çizgi GW (sol eksen), ince kesik çizgi tesis sayısı ",
              "(sağ eksen)."),
       " Yenilenebilirin iki eğrisinin açılması bir bulgudur: çok sayıda, çok ",
@@ -1362,7 +1368,7 @@ function(input, output, session) {
 
   output$policy_panel <- renderUI({
     if (is.null(policy_events)) {
-      return(tags$p(style = "font-size:13px; color:#888;",
+      return(tags$p(style = "font-size:13px; color:var(--ink-faint);",
                     "Politika takvimi dosyası bulunamadı: ",
                     tags$code("policies/policy_timeline.json")))
     }
@@ -1380,10 +1386,14 @@ function(input, output, session) {
       tags$div(
         style = paste0(
           "padding:9px 0 9px 11px; border-left:3px solid ", col,
-          "; margin-bottom:9px;", if (future) " opacity:.5;" else ""),
+          # Events past the slider year are dimmed rather than hidden, because
+          # the calendar ending at the chosen year would misrepresent it. 0.5
+          # was set against a white page; on the dark ground it takes the text
+          # below the readable range, so it is 0.68 here.
+          "; margin-bottom:9px;", if (future) " opacity:.68;" else ""),
         tags$div(
           style = "display:flex; gap:8px; align-items:baseline; flex-wrap:wrap;",
-          tags$span(style = "font-family:monospace; font-size:12px; color:#666;",
+          tags$span(style = "font-family:monospace; font-size:12px; color:var(--ink-soft);",
                     e$date),
           tags$span(
             style = paste0("font-size:10px; letter-spacing:.06em;",
@@ -1392,18 +1402,18 @@ function(input, output, session) {
                            " color:", col, ";"),
             POLICY_CATEGORY_LABELS[[e$category]]),
           if (e$value_type == "scheduled") {
-            tags$span(style = "font-size:11px; color:#E8A33D;", "planlanan")
+            tags$span(style = "font-size:11px; color:var(--warn);", "planlanan")
           },
           if (e$granularity == "year") {
-            tags$span(style = "font-size:11px; color:#888;", "yıl hassasiyeti")
+            tags$span(style = "font-size:11px; color:var(--ink-faint);", "yıl hassasiyeti")
           }
         ),
         tags$div(style = "font-weight:600; font-size:13.5px; margin-top:3px;",
                  e$title_tr),
-        tags$div(style = "font-size:12.5px; color:#666; margin-top:2px;",
+        tags$div(style = "font-size:12.5px; color:var(--ink-soft); margin-top:2px;",
                  e$summary_tr),
         tags$div(
-          style = "font-size:11px; color:#999; margin-top:4px;",
+          style = "font-size:11px; color:var(--ink-faint); margin-top:4px;",
           "Kaynak: ",
           if (!is.na(e$source_url)) {
             tags$a(href = e$source_url, target = "_blank", rel = "noopener",
@@ -1417,7 +1427,7 @@ function(input, output, session) {
       # The honest header. This is the single most important thing on the panel.
       tags$div(
         style = paste0("padding:10px 12px; margin-bottom:14px;",
-                       " background:#FDECEA; border-left:4px solid #C0392B;",
+                       " background:#231014; border-left:4px solid var(--bad);",
                        " font-size:12.5px;"),
         tags$b("Bu takvim eksik ve eksikliği rastgele değil."),
         " Buradaki ", nrow(ev), " olayın tamamı AB SKDM ve Türkiye ETS mevzuatı, ",
@@ -1435,8 +1445,8 @@ function(input, output, session) {
       lapply(seq_len(nrow(ev)), row_ui),
 
       tags$p(
-        style = paste0("font-size:11.5px; color:#888; margin-top:12px;",
-                       " border-top:1px solid #eee; padding-top:10px;"),
+        style = paste0("font-size:11.5px; color:var(--ink-faint); margin-top:12px;",
+                       " border-top:1px solid var(--rule); padding-top:10px;"),
         "Hiçbir olay bu proje için yeniden araştırılmadı; hepsi ",
         tags$code("policies/"), " altındaki mevcut parametre dosyalarından ",
         "türetildi ve kaynağı taşındı. Solmuş satırlar slider'ın henüz ",
@@ -1452,7 +1462,7 @@ function(input, output, session) {
 
     bar <- function(share, colour) {
       tags$div(
-        style = "background:#e6eaec; height:7px; border-radius:2px; width:100%;",
+        style = "background:var(--surface-3); height:7px; border-radius:2px; width:100%;",
         tags$div(style = paste0("background:", colour, "; height:7px;",
                                 " border-radius:2px; width:",
                                 round(100 * share), "%;")))
@@ -1477,8 +1487,8 @@ function(input, output, session) {
           bar(cv$share[i], TL_COLOURS[[g]]))
       }),
       tags$p(
-        style = paste0("font-size:12px; color:#666; margin-top:14px;",
-                       " border-top:1px solid #eee; padding-top:10px;"),
+        style = paste0("font-size:12px; color:var(--ink-soft); margin-top:14px;",
+                       " border-top:1px solid var(--rule); padding-top:10px;"),
         tags$b("Yanma %59, yenilenebilir %93. "),
         "İki eğriyi ham hâlde karşılaştırmak, yanmayı olduğundan küçük ve ",
         "geçişi olduğundan keskin gösterir. Kapsama oranı burada gösteriliyor ",
@@ -1516,30 +1526,30 @@ function(input, output, session) {
         tags$thead(tags$tr(
           lapply(c("Yıl", "Ember", "Climate TRACE", "CT filosu (naif)",
                    "CT kapsaması", "Yenilenebilir"),
-                 function(h) tags$th(style = "text-align:left; padding:6px; border-bottom:2px solid #ddd;", h))
+                 function(h) tags$th(style = "text-align:left; padding:6px; border-bottom:2px solid var(--rule);", h))
         )),
         tags$tbody(lapply(seq_len(nrow(g)), function(i) {
           tags$tr(
-            tags$td(style = "padding:6px; border-bottom:1px solid #eee;", g$year[i]),
-            tags$td(style = "padding:6px; border-bottom:1px solid #eee; font-weight:600;",
+            tags$td(style = "padding:6px; border-bottom:1px solid var(--rule);", g$year[i]),
+            tags$td(style = "padding:6px; border-bottom:1px solid var(--rule); font-weight:600;",
                     round(g$ember_g_per_kwh[i])),
-            tags$td(style = "padding:6px; border-bottom:1px solid #eee; font-weight:600;",
+            tags$td(style = "padding:6px; border-bottom:1px solid var(--rule); font-weight:600;",
                     round(g$ct_reported_g_per_kwh[i])),
-            tags$td(style = "padding:6px; border-bottom:1px solid #eee; color:#C0392B;",
+            tags$td(style = "padding:6px; border-bottom:1px solid var(--rule); color:var(--bad);",
                     round(g$ct_naive_g_per_kwh[i])),
-            tags$td(style = "padding:6px; border-bottom:1px solid #eee;",
+            tags$td(style = "padding:6px; border-bottom:1px solid var(--rule);",
                     paste0("%", round(100 * g$ct_coverage_share[i]))),
-            tags$td(style = "padding:6px; border-bottom:1px solid #eee;",
+            tags$td(style = "padding:6px; border-bottom:1px solid var(--rule);",
                     paste0("%", round(100 * g$renewable_share[i])))
           )
         }))
       ),
-      tags$p(style = "font-size:12px; color:#666; margin-top:6px;",
+      tags$p(style = "font-size:12px; color:var(--ink-soft); margin-top:6px;",
              "gCO₂/kWh"),
 
       tags$div(
-        style = paste0("margin-top:16px; padding:10px 14px; background:#FDECEA;",
-                       " border-left:4px solid #C0392B; font-size:13px;"),
+        style = paste0("margin-top:16px; padding:10px 14px; background:#231014;",
+                       " border-left:4px solid var(--bad); font-size:13px;"),
         tags$b("Üçüncü sütun neden yanlış? "),
         "Climate TRACE'in Türkiye elektrik kütüğü yalnızca yanma tesislerini ",
         "içeriyor — hidro, rüzgâr, güneş, jeotermal ve nükleer yok. Ulusal ",
@@ -1586,7 +1596,7 @@ function(input, output, session) {
       tags$h4("Esri — altlık harita"),
       tags$p("Dark Gray Canvas. ", HTML(ESRI_ATTRIB), "."),
       tags$p(
-        style = "font-size:12px; color:#666;",
+        style = "font-size:12px; color:var(--ink-soft);",
         tags$b("Neden CartoDB değil: "),
         "CARTO altlık haritaları için artık API anahtarı istiyor ve anahtarsız ",
         "kullanımda karoların üstüne çapraz olarak ",
@@ -1596,7 +1606,7 @@ function(input, output, session) {
         "açılıp bakıldığında görüldü."
       ),
 
-      tags$p(style = "font-size:12px; color:#666;",
+      tags$p(style = "font-size:12px; color:var(--ink-soft);",
              "Atıf, CC BY 4.0'ın ", tags$b("hukuki koşuludur"),
              "; nezaket değildir. Hiçbir kaynak bu projeyi onaylamamaktadır."),
 
@@ -1633,7 +1643,7 @@ function(input, output, session) {
         tags$li("Kaynak veriler kendi lisanslarını korur")
       ),
 
-      tags$p(style = "margin-top:16px; font-size:12px; color:#666;",
+      tags$p(style = "margin-top:16px; font-size:12px; color:var(--ink-soft);",
              "Tam atıf zinciri, sürüm etiketleri ve SHA-256 özetleri için: ",
              tags$code("data/processed/SOURCES.md"), ", ",
              tags$code("SOURCES_GEM.md"), ", ",

@@ -117,6 +117,69 @@ test_that("no two sector colours are confusable", {
 })
 
 
+test_that("the interface theme is legible on its own ground", {
+  e <- .app_env()
+
+  # The theme moved the whole application onto a dark ground, not just the map,
+  # and the same failure mode follows it: a colour picked against a white editor
+  # is invisible here and nothing errors. These are the values that are NOT
+  # governed by atlas.css because base graphics and leaflet cannot read CSS
+  # custom properties, so they are the ones that can drift out of the palette
+  # without anyone noticing.
+
+  # Text and axis furniture against the plot surface. 3.0 is the graphical-object
+  # threshold; ink is body text and is held to a stricter bar.
+  expect_gte(.contrast_ratio(e$PLOT_INK,  e$PLOT_BG), 7.0)
+  expect_gte(.contrast_ratio(e$PLOT_SOFT, e$PLOT_BG), 4.5)
+  expect_gte(.contrast_ratio(e$PLOT_FAINT, e$PLOT_BG), 3.0)
+
+  # The two gas bases are drawn on one plot and must be separable from the
+  # surface AND from each other, because reading one curve as the other is
+  # exactly the confusion §6 forbids.
+  for (nm in names(e$GAS_COLOURS)) {
+    r <- .contrast_ratio(e$GAS_COLOURS[[nm]], e$PLOT_BG)
+    expect_gte(r, 3.0, label = paste0("gas ", nm, " contrast ", round(r, 2)))
+  }
+  d_gas <- stats::dist(t(grDevices::col2rgb(e$GAS_COLOURS)))
+  expect_gte(as.numeric(d_gas), 60)
+
+  # Geocode badges. These carry the strength of a province assignment, so a
+  # badge the user cannot distinguish defeats the point of showing it (§8.4).
+  for (nm in names(e$GEOCODE_BADGE)) {
+    r <- .contrast_ratio(e$GEOCODE_BADGE[[nm]], e$PLOT_BG)
+    expect_gte(r, 3.0,
+               label = paste0("geocode badge ", nm, " (", e$GEOCODE_BADGE[[nm]],
+                              ") contrast ", round(r, 2)))
+  }
+})
+
+
+test_that("the plot constants still match the tokens in atlas.css", {
+  # PLOT_* duplicates values that atlas.css declares as custom properties,
+  # because base graphics cannot read CSS. Duplication that nothing checks
+  # drifts, and the symptom would be a plot panel a few shades off the box it
+  # sits in — visible, annoying, and easy to blame on the screenshot.
+  css_path <- file.path(ROOT, "app", "www", "atlas.css")
+  skip_if_not(file.exists(css_path), "atlas.css not present")
+
+  e   <- .app_env()
+  css <- readLines(css_path, encoding = "UTF-8", warn = FALSE)
+
+  token <- function(name) {
+    line <- grep(paste0("^\\s*--", name, ":"), css, value = TRUE)[1]
+    if (is.na(line)) return(NA_character_)
+    toupper(sub(".*:\\s*(#[0-9A-Fa-f]{6}).*", "\\1", line))
+  }
+
+  expect_equal(token("surface"),     toupper(e$PLOT_BG))
+  expect_equal(token("ink"),         toupper(e$PLOT_INK))
+  expect_equal(token("ink-soft"),    toupper(e$PLOT_SOFT))
+  expect_equal(token("ink-faint"),   toupper(e$PLOT_FAINT))
+  expect_equal(token("rule"),        toupper(e$PLOT_RULE))
+  expect_equal(token("rule-strong"), toupper(e$PLOT_AXIS))
+})
+
+
 test_that("every sector and fleet fuel has a colour and a label", {
   e <- .app_env()
 

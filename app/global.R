@@ -189,11 +189,43 @@ GEOCODE_LABELS <- c(
 )
 
 GEOCODE_BADGE <- c(
-  "within_province"    = "#4C9A2A",
-  "boundary_proximate" = "#E8A33D",
-  "snapped_to_nearest" = "#C0392B",
-  "offshore"           = "#2166AC"
+  "within_province"    = "#57D9A3",
+  "boundary_proximate" = "#FF9F1C",
+  "snapped_to_nearest" = "#FF4D6D",
+  "offshore"           = "#4CC9F0"
 )
+
+# ---- Plot theme --------------------------------------------------------------
+# Base graphics cannot read the CSS custom properties declared in
+# app/www/atlas.css, so the values the plots need are mirrored here. These are
+# the ONLY colours duplicated between R and CSS in the project; if a token
+# changes there it must be changed here in the same commit.
+#
+# The plots are drawn on the box surface rather than on white. A white plot
+# panel on a dark page is the single loudest thing on the screen, and it would
+# be brighter than the map — which is the one element that is supposed to hold
+# attention.
+PLOT_BG    <- "#12181D"   # --surface
+PLOT_INK   <- "#E4E9EC"   # --ink
+PLOT_SOFT  <- "#93A1AB"   # --ink-soft
+PLOT_FAINT <- "#5F6C75"   # --ink-faint
+PLOT_RULE  <- "#212B33"   # --rule
+PLOT_AXIS  <- "#2E3A44"   # --rule-strong
+
+# The two gas bases carry the two ends of the semantic palette. They are drawn
+# on separate axes and must never be read as summable (§6), so they are given
+# hues that do not blend: warm red against cold cyan.
+GAS_COLOURS <- c(
+  "co2"        = "#FF4D6D",
+  "co2e_100yr" = "#4CC9F0"
+)
+
+# Applied at the top of every renderPlot so no plot has to remember the theme.
+# Returns the previous settings, for on.exit(par(op)).
+plot_theme <- function(...) {
+  par(bg = PLOT_BG, fg = PLOT_AXIS, col.axis = PLOT_SOFT, col.lab = PLOT_SOFT,
+      col.main = PLOT_INK, family = "sans", ...)
+}
 
 # The two populations are denominated in different gases and must never be
 # summed. The label travels with every figure that carries a gas basis.

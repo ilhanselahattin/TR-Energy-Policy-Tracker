@@ -4,7 +4,7 @@
 this file says where it *got to*, what runs, what is blocked, and which traps have already
 been paid for.
 
-Last updated: **2026-09-06** · 45 commits · **~78% complete** · 297 assertions passing
+Last updated: **2026-09-07** · 48 commits · **~78% complete** · 313 assertions passing
 
 > The figure moved 53% → 35% → 58% → 69% → 72% → 76% → 75%. Both falls are denominator
 > corrections, not lost work: the 2026-08-19 scope merge, and then finding on 2026-09-01
@@ -110,6 +110,7 @@ ratios are **recomputed from annual totals** rather than averaged across months.
 | Grid emission factor | 6 | ◐ 60% — three estimates assembled, selection pending |
 | `eu_export_share` | 4 | ◐ 50% — fetch works, definition pending |
 | App phase 2 (slider, cost, energy layer, audit trail) | 8 | ◐ 80% — both time axes, emissions-scaled markers, projection styling, two series charts and the coverage band are in; no cost layer or audit-trail panel, both blocked on B9 |
+| Interface theme (`app/www/atlas.css`) | 2 | ✅ — IBM Plex Sans/Mono, one dark palette across chrome, plots and leaflet, sticky map, `lang="tr"` casing |
 | Energy emissions panel | 6 | ✅ |
 | `facility_panel.rds` (industrial) | 8 | ◐ 65% — built, gated and tested; `co2_direct_t` / `co2_indirect_t` await B1 |
 | CBAM calculation core | 8 | ❌ |
@@ -481,6 +482,12 @@ scripts/03_…           facility_panel.rds. Monthly -> annual: flows sum,
                        totals. Also writes panel_b1_inputs.csv, a diagnostic
                        that lays out every other* slot by its own _def label so
                        B1 is a reading task rather than a research one
+
+app/www/atlas.css      The whole visual theme, in one file. Tokens on :root;
+                       nothing in ui.R or server.R sets a colour literal any
+                       more except the PLOT_* constants in global.R, which
+                       mirror six of the tokens because base graphics cannot
+                       read CSS. test-palette.R asserts that mirror still holds
 
 tests/                 testthat; data-property assertions, not unit tests.
                        Skip rather than fail when an artefact is unbuilt

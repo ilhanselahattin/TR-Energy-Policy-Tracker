@@ -39,7 +39,7 @@ dashboardPage(
       menuItem("Veri Kaynakları",  tabName = "sources", icon = icon("book"))
     ),
 
-    tags$hr(style = "border-color: #4b5c66; margin: 10px 15px;"),
+    tags$hr(style = "border-color: var(--rule); margin: 10px 15px;"),
 
     # --- THE TIME SLIDER ------------------------------------------------------
     # First control, deliberately. Everything below it selects a subset; this
@@ -68,15 +68,15 @@ dashboardPage(
         )
       } else {
         tags$div(
-          style = paste0("padding:10px; background:#3c4b52; font-size:12px;",
-                         " border-left:3px solid #E8A33D; color:#c8d0d4;"),
+          style = paste0("padding:10px; background:var(--surface-2); font-size:12px;",
+                         " border-left:3px solid var(--warn); color:var(--ink-soft);"),
           tags$b("Zaman serisi yok."), " Emisyon paneli üretilmemiş. ",
           "Çalıştırın: ", tags$code("Rscript scripts/03_build_panel.R")
         )
       }
     ),
 
-    tags$hr(style = "border-color: #4b5c66; margin: 6px 15px 10px 15px;"),
+    tags$hr(style = "border-color: var(--rule); margin: 6px 15px 10px 15px;"),
 
     tags$div(
       style = "padding: 0 15px;",
@@ -108,7 +108,7 @@ dashboardPage(
         options  = list(placeholder = "Tüm iller")
       ),
 
-      tags$hr(style = "border-color: #4b5c66;"),
+      tags$hr(style = "border-color: var(--rule);"),
 
       # The renewable fleet is context, not part of the modelled population, so
       # it is off by default and labelled as a separate register.
@@ -162,57 +162,40 @@ dashboardPage(
     # mojibake regardless of the file's own encoding (§2).
     tags$head(
       tags$meta(charset = "UTF-8"),
-      tags$style(HTML("
-        .content-wrapper { background-color: #f4f6f9; }
-        .small-box h3 { font-size: 26px; }
-        .estimate-note {
-          background: #FFF8E1; border-left: 4px solid #E8A33D;
-          padding: 10px 14px; margin-bottom: 12px; font-size: 13px;
-        }
-        .basis-note {
-          background: #EAF2FA; border-left: 4px solid #2166AC;
-          padding: 10px 14px; margin-bottom: 12px; font-size: 13px;
-        }
-        /* A projection must never look like an observation (§5). The badge is
-           deliberately loud: it is easier to ignore a colour than a word. */
-        .projection-note {
-          background: #F3E5F5; border-left: 4px solid #7B1FA2;
-          padding: 10px 14px; margin-bottom: 12px; font-size: 13px;
-        }
-        .partial-note {
-          background: #FFF3E0; border-left: 4px solid #E8A33D;
-          padding: 10px 14px; margin-bottom: 12px; font-size: 13px;
-        }
-        .yr-badge {
-          display: inline-block; padding: 1px 7px; border-radius: 3px;
-          font-size: 11px; font-weight: 600; letter-spacing: .3px;
-        }
-        /* Dark basemap. The container colour matters while tiles load and
-           wherever they fail: a light gap on a dark map reads as a rendering
-           fault, and on a slow connection it is the first thing seen. */
-        .leaflet-container { background: #0E1418; }
-        /* Leaflet's legend and popups default to white panels, which punch
-           bright holes in a dark map. Restyled to sit on it instead. */
-        .leaflet-control .legend,
-        .leaflet-bottom .info.legend {
-          background: rgba(14,20,24,0.88) !important;
-          color: #DDE3E7 !important;
-          border: 1px solid #2A3339 !important;
-          border-radius: 3px;
-        }
-        .leaflet-popup-content-wrapper, .leaflet-popup-tip {
-          background: #161D22; color: #DDE3E7;
-          box-shadow: 0 2px 12px rgba(0,0,0,.5);
-        }
-        .leaflet-popup-content-wrapper a { color: #4CC9F0; }
-        .leaflet-tooltip {
-          background: rgba(14,20,24,0.92); color: #DDE3E7;
-          border: 1px solid #2A3339;
-        }
-        .leaflet-tooltip-left:before { border-left-color: #2A3339; }
-        .leaflet-tooltip-right:before { border-right-color: #2A3339; }
-        table.kv td { padding: 4px 10px 4px 0; font-size: 13px; }
-      "))
+
+      # The document language must be Turkish, and this is not metadata hygiene
+      # — it changes what the page renders. atlas.css sets `text-transform:
+      # uppercase` on every label, and CSS casing is language-dependent: under
+      # lang="en" the browser maps i → I, so "İşletmeci" comes out "IŞLETMECI"
+      # and "İl" comes out "IL". Under lang="tr" it maps i → İ and the labels
+      # read TESİS HARİTASI, FİLO GELİŞİMİ, VERİ KAYNAKLARI as they should.
+      # Verified in Chrome by rendering the sidebar under both languages.
+      #
+      # It is set from a script because shinydashboard::dashboardPage() takes no
+      # `lang` argument and emits the <html> tag itself. The script sits in
+      # <head>, so it runs before the body is parsed and there is no flash of
+      # wrongly-cased text.
+      tags$script(HTML("document.documentElement.lang = 'tr';")),
+
+      # IBM Plex Sans / Mono. One superfamily drawn for technical documentation,
+      # carrying prose and instrumentation respectively. Loaded from Google
+      # Fonts; every rule in atlas.css declares a system fallback stack, so the
+      # app degrades to Segoe UI / Consolas offline rather than breaking.
+      tags$link(rel = "preconnect", href = "https://fonts.googleapis.com"),
+      tags$link(rel = "preconnect", href = "https://fonts.gstatic.com", crossorigin = NA),
+      tags$link(
+        rel  = "stylesheet",
+        href = paste0(
+          "https://fonts.googleapis.com/css2",
+          "?family=IBM+Plex+Mono:wght@400;500;600",
+          "&family=IBM+Plex+Sans:wght@400;500;600;700",
+          "&display=swap"
+        )
+      ),
+
+      # Everything visual lives in one stylesheet rather than inline here, so
+      # the palette can be read, reviewed and changed in one place.
+      tags$link(rel = "stylesheet", type = "text/css", href = "atlas.css")
     ),
 
     tabItems(
@@ -254,13 +237,29 @@ dashboardPage(
           valueBoxOutput("box_year",       width = 3)
         ),
 
-        fluidRow(
+        # Written as a div rather than fluidRow() only so the row can carry a
+        # class. atlas.css turns it into a flex row above 1200px, which is what
+        # makes the sticky map below possible: Bootstrap 3 columns are floated,
+        # so the left column would otherwise be exactly as tall as the map and a
+        # sticky element inside it would have no distance to travel.
+        tags$div(
+          class = "row sticky-row",
           column(
             width = 8,
-            box(
-              width = NULL, status = "primary", solidHeader = TRUE,
-              title = textOutput("map_title", inline = TRUE),
-              leafletOutput("map", height = 620)
+            # The map holds its position while the right-hand column scrolls.
+            # Selecting a facility fills that column with the detail panel, the
+            # series, ownership and the geocode note, which is far taller than
+            # the map — so reading any of it used to scroll the map off the
+            # screen, and the user lost the point they had just clicked.
+            # Disabled below 1200px, where the columns stack and there is
+            # nothing beside the map to scroll against.
+            tags$div(
+              class = "sticky-map",
+              box(
+                width = NULL, status = "primary", solidHeader = TRUE,
+                title = textOutput("map_title", inline = TRUE),
+                leafletOutput("map", height = 620)
+              )
             )
           ),
           column(
