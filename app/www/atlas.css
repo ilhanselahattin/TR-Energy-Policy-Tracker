@@ -1,491 +1,472 @@
 /* ==========================================================================
    atlas.css — Türkiye Karbon Atlası
    --------------------------------------------------------------------------
-   A dark instrument panel, not a corporate dashboard.
+   A scan readout laid out like a poster.
 
-   THE PROBLEM THIS SOLVES. The map moved to a dark basemap and the chrome
-   around it stayed light, so the page read as a lit window in a bright room.
-   Worse, shinydashboard's default value boxes are large saturated blocks of
-   red, blue and green — which put four of the loudest things on the page in
-   competition with the only thing that should be loud: 300 facility markers.
+   WHAT THIS REPLACES AND WHY. The previous sheet took shinydashboard's card
+   layout and painted it dark. That is a skin, and a skin produces exactly what
+   it produced: a page with no identity. The brief was two references — a
+   phosphor scan terminal and a Y2K poster — and what they share is not a
+   palette. It is that neither contains a card. No fill, no shadow, no rounded
+   corner, no coloured header bar. A hairline rectangle, a label hung on its
+   edge, and type doing the rest.
 
-   THE RULE THE WHOLE SHEET FOLLOWS. The data is the only saturated thing.
-   Every surface here is a neutral in the same cool family, every accent is a
-   2px rule rather than a fill, and the sector palette — already contrast-tested
-   against the basemap in global.R — is left as the single source of colour.
+   THE SPLIT. Skeleton from the poster: flat ground, hairline frames, one large
+   tight lowercase headline, small tags in the corners, two-digit indices on the
+   frames. Body from the terminal: monospace throughout, uppercase letter-spaced
+   keys, dotted leader lines running out to right-aligned values. The poster
+   gives the page a face; the terminal carries the data.
 
-   HOW ATMOSPHERE IS BUILT WITHOUT IMAGERY. There are no photographs in this
-   project and there should not be: it is an inventory of infrastructure, and a
-   stock image of a smokestack would be decoration standing in for evidence.
-   The weight comes from four things instead — a deep ground the map sits on
-   like a lit panel; square corners throughout, because a rounded card reads as
-   a consumer app and this is a measuring instrument; monospaced, letter-spaced
-   uppercase for every label, so the page reads as instrumentation; and a large
-   type scale on the figures, so a number carries the presence an image would.
+   THE PALETTE IS EIGHT VALUES AND ONE OF THEM IS SATURATED.
+   There is no red and no amber in this sheet, and that is measured rather than
+   restraint for its own sake. The eight sector hues are fixed and contrast
+   tested; a chrome accent landing on one of them makes the frames argue with
+   the map. Hue separation from the nearest sector colour, measured:
 
-   TYPE. IBM Plex Sans and IBM Plex Mono. One superfamily, drawn for technical
-   documentation, and the face Reddit adopted in its 2023 rebrand — the author
-   asked for it by that description. Plex Mono carries every label, unit and
-   figure; Plex Sans carries prose.
+       phosphor green #7CFFB2   10 deg from oil-and-gas-production   COLLIDES
+       CRT amber      #FFB000    1 deg from aluminum                 COLLIDES
+       electric blue  #2323FF   15 deg from oil-and-gas-refining     COLLIDES
+       cyan           #4CC9F0    0 deg — it IS electricity-generation
+       acid green     #C8FF00   31 deg from aluminum                 free
+       cold white     #D7E2E8   saturation 7 percent, reads neutral  free
+
+   So the chrome is cold white, and acid green marks exactly one thing: state
+   that is live — the active tab, an observed rather than projected year, the
+   slider handle, the focus ring. It never appears on the map.
+
+   Failure and warning carry no colour at all. The scan terminal in the
+   reference prints STATUS: FAIL in the same phosphor as everything else and
+   lets the word carry it; a red here would be a ninth data hue competing with
+   iron-and-steel, which sits one degree away.
    ========================================================================== */
 
 :root {
-  /* Grounds, deepest first. The map's own basemap sits at #12181C, so the page
-     is deliberately darker than the map: the map reads as illuminated. */
-  --ground:        #0A0E11;
-  --surface:       #12181D;
-  --surface-2:     #182027;
-  --surface-3:     #1E2830;
-  --sidebar:       #080C0F;
+  --void:     #05070A;   /* the page */
+  --panel:    #0A0E12;   /* only where content needs a floor: map, plots */
+  --line:     #1C242B;   /* every frame */
+  --line-hot: #2E3A44;   /* leader dots, corner ticks, active edges */
+  --sidebar:  #030507;
 
-  --rule:          #212B33;
-  --rule-strong:   #2E3A44;
+  --ink:      #E8EDF0;   /* figures and body */
+  --ink-2:    #8DA0AD;   /* secondary prose */
+  --ink-3:    #55646F;   /* keys, indices, tags */
 
-  --ink:           #E4E9EC;
-  --ink-soft:      #93A1AB;
-  --ink-faint:     #5F6C75;
+  --live:     #C8FF00;   /* the only saturated value in the chrome */
 
-  /* Semantic, and separate from the sector palette on purpose. These say
-     "state" — good, caution, wrong — and never compete with the data hues. */
-  --good:          #57D9A3;
-  --warn:          #FF9F1C;
-  --bad:           #FF4D6D;
-  --info:          #4CC9F0;
-  --projected:     #B084F5;
-
-  --sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --poster: "Inter Tight", "Helvetica Neue", Arial, sans-serif;
+  --mono:   "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
 }
 
 /* --------------------------------------------------------------------------
    Base
    -------------------------------------------------------------------------- */
 
-/* background-COLOR, not the `background` shorthand: the shorthand carries
-   !important and would reset the ground grid declared below back to none. */
 body, .content-wrapper, .right-side, .wrapper {
-  background-color: var(--ground) !important;
+  background-color: var(--void) !important;
   color: var(--ink);
-  font-family: var(--sans);
-  font-size: 14px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
 }
 
-/* A measurement grid on the page ground. There is no imagery in this project
-   and there should not be — it is an inventory of infrastructure, and a stock
-   photograph of a smokestack would be decoration standing in for evidence. But
-   a page whose empty regions are flat black reads as unfinished rather than as
-   deliberate, and the map tab has a tall empty column below the map.
-   A 32px rule grid at roughly 2% contrast fills it the way graph paper does:
-   visible enough to give the surface a scale, far too faint to compete with a
-   single facility marker. */
-.content-wrapper {
-  padding-bottom: 60px;
-  background-image:
-    linear-gradient(to right,  rgba(140, 165, 180, 0.05) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(140, 165, 180, 0.05) 1px, transparent 1px);
-  background-size: 32px 32px;
-}
+.content-wrapper { padding: 0 0 64px; }
+body { font-variant-numeric: tabular-nums; }
 
-/* Digits line up in every table and every figure. */
-.small-box h3, table, .kv td, .mono, code, pre {
-  font-variant-numeric: tabular-nums;
-}
+::selection { background: var(--live); color: var(--void); }
 
-::selection { background: var(--info); color: #06090B; }
+a { color: var(--ink); text-decoration: underline; text-underline-offset: 2px;
+    text-decoration-color: var(--line-hot); }
+a:hover { color: var(--live); text-decoration-color: var(--live); }
+:focus-visible { outline: 1px solid var(--live); outline-offset: 2px; }
+hr { border: 0; border-top: 1px solid var(--line); margin: 14px 0; }
+b, strong { color: #FFFFFF; font-weight: 600; }
+p { margin: 0 0 9px; }
+
+code {
+  font-family: var(--mono); font-size: 0.9em;
+  color: var(--live); background: transparent;
+  border: 1px solid var(--line); border-radius: 0; padding: 0 4px;
+}
 
 /* --------------------------------------------------------------------------
-   Header and sidebar
+   The poster line — header
    -------------------------------------------------------------------------- */
 
 .skin-black .main-header .logo,
 .skin-black .main-header .navbar {
-  background: var(--sidebar) !important;
-  border-bottom: 1px solid var(--rule);
+  background: var(--void) !important;
+  border-bottom: 1px solid var(--line);
+  height: 62px;
+  line-height: 62px;
 }
 
+/* Lowercase, tight, closed with a full stop. The reference poster's device, and
+   the only place on the page where type is allowed to be large. */
 .skin-black .main-header .logo {
-  font-family: var(--sans);
-  font-weight: 600;
-  font-size: 17px;
-  letter-spacing: -0.01em;
+  font-family: var(--poster) !important;
+  font-weight: 700;
+  font-size: 27px;
+  letter-spacing: -0.045em;
+  text-transform: lowercase;
   color: var(--ink) !important;
+  text-align: left;
+  padding: 0 0 0 20px;
+  width: 300px;
+}
+.skin-black .main-header .logo::after { content: "."; color: var(--live); }
+
+.skin-black .main-header .navbar .sidebar-toggle {
+  color: var(--ink-3) !important; font-size: 13px; line-height: 62px; height: 62px;
+}
+.skin-black .main-header .navbar .sidebar-toggle:hover {
+  background: transparent !important; color: var(--live) !important;
 }
 
-.skin-black .main-header .navbar .sidebar-toggle { color: var(--ink-soft) !important; }
-.skin-black .main-header .navbar .sidebar-toggle:hover {
-  background: var(--surface-2) !important; color: var(--ink) !important;
-}
+/* --------------------------------------------------------------------------
+   Sidebar
+   -------------------------------------------------------------------------- */
 
 .skin-black .main-sidebar, .skin-black .wrapper { background: var(--sidebar) !important; }
-.skin-black .sidebar { padding-bottom: 40px; }
+.skin-black .main-sidebar { border-right: 1px solid var(--line); }
+.skin-black .sidebar { padding-bottom: 48px; }
 
-/* Menu items as instrument labels: uppercase mono, a left rule marking the
-   active one rather than a filled block. */
+.skin-black .sidebar-menu { margin-top: 6px; }
 .skin-black .sidebar-menu > li > a {
   font-family: var(--mono);
-  font-size: 11.5px;
-  letter-spacing: 0.07em;
+  font-size: 11px;
+  letter-spacing: 0.11em;
   text-transform: uppercase;
-  color: var(--ink-soft) !important;
+  color: var(--ink-3) !important;
   border-left: 2px solid transparent !important;
-  padding: 12px 14px;
+  padding: 11px 16px;
+  background: transparent !important;
 }
-.skin-black .sidebar-menu > li:hover > a {
-  background: var(--surface) !important;
-  color: var(--ink) !important;
-}
+/* The word is enough; an icon beside a letter-spaced monospace label is noise. */
+.skin-black .sidebar-menu > li > a > i { display: none; }
+.skin-black .sidebar-menu > li:hover > a { color: var(--ink) !important; }
 .skin-black .sidebar-menu > li.active > a {
-  background: var(--surface) !important;
   color: var(--ink) !important;
-  border-left: 2px solid var(--info) !important;
+  border-left-color: var(--live) !important;
 }
 
-/* Sidebar form controls */
-.skin-black .sidebar hr { border-color: var(--rule) !important; }
-
+/* A line under the field, not a box around it. */
 .sidebar .control-label,
-.sidebar label,
 .sidebar .shiny-input-container > label {
-  font-family: var(--mono);
-  font-size: 10.5px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--ink-faint);
-  font-weight: 500;
-  margin-bottom: 6px;
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--ink-3); font-weight: 400;
+  margin-bottom: 7px;
 }
-
 .sidebar .checkbox label, .sidebar .radio label {
-  font-family: var(--sans);
-  font-size: 13px;
-  letter-spacing: 0;
-  text-transform: none;
-  color: var(--ink-soft);
+  font-size: 12px; letter-spacing: 0; text-transform: none; color: var(--ink-2);
 }
-
-.sidebar select.form-control,
-.sidebar .selectize-input,
-.sidebar .form-control {
-  background: var(--surface) !important;
-  border: 1px solid var(--rule) !important;
-  border-radius: 0 !important;
-  color: var(--ink) !important;
-  box-shadow: none !important;
-  font-size: 13px;
+.sidebar select.form-control, .sidebar .selectize-input, .sidebar .form-control {
+  background: transparent !important;
+  border: 0 !important; border-bottom: 1px solid var(--line) !important;
+  border-radius: 0 !important; box-shadow: none !important;
+  color: var(--ink) !important; font-size: 12px; padding-left: 0 !important;
 }
-.sidebar .selectize-input.focus,
-.sidebar .form-control:focus { border-color: var(--info) !important; }
-
+.sidebar .selectize-input.focus, .sidebar .form-control:focus {
+  border-bottom-color: var(--live) !important;
+}
 .sidebar .selectize-dropdown {
-  background: var(--surface-2) !important;
-  border: 1px solid var(--rule-strong) !important;
-  border-radius: 0 !important;
-  color: var(--ink);
+  background: var(--panel) !important; border: 1px solid var(--line-hot) !important;
+  border-radius: 0 !important; color: var(--ink); font-size: 12px;
 }
-.sidebar .selectize-dropdown .active { background: var(--surface-3) !important; }
+.sidebar .selectize-dropdown .active { background: var(--void) !important; color: var(--live); }
 .sidebar .selectize-input > .item {
-  background: var(--surface-3) !important;
-  border: 1px solid var(--rule-strong) !important;
-  border-radius: 0 !important;
-  color: var(--ink) !important;
+  background: transparent !important; border: 1px solid var(--line) !important;
+  border-radius: 0 !important; color: var(--ink-2) !important;
+  font-size: 11px; padding: 0 5px !important;
 }
+.sidebar input[type="checkbox"], .sidebar input[type="radio"] { accent-color: var(--live); }
 
 /* --------------------------------------------------------------------------
-   The time slider — the most important control on the page (§5)
+   Time slider — the most important control on the page (KARBON_ATLASI.md §5)
    -------------------------------------------------------------------------- */
 
-.irs--shiny .irs-bar        { background: var(--info); border-color: var(--info); height: 4px; top: 27px; }
-.irs--shiny .irs-line       { background: var(--rule); border: none; height: 4px; top: 27px; border-radius: 0; }
-.irs--shiny .irs-handle     { background: var(--ink); border: 2px solid var(--info); box-shadow: none; width: 16px; height: 16px; top: 21px; }
+.irs--shiny .irs-line  { background: var(--line); border: 0; height: 1px; top: 29px; border-radius: 0; }
+.irs--shiny .irs-bar   { background: var(--line-hot); border: 0; height: 1px; top: 29px; }
+.irs--shiny .irs-handle {
+  background: var(--live); border: 0; box-shadow: none;
+  width: 3px; height: 15px; top: 22px; border-radius: 0;
+}
 .irs--shiny .irs-handle > i { display: none; }
 .irs--shiny .irs-from, .irs--shiny .irs-to, .irs--shiny .irs-single {
-  background: var(--info); color: #06090B; border-radius: 0;
-  font-family: var(--mono); font-weight: 600; font-size: 11px;
+  background: transparent; color: var(--live); border-radius: 0;
+  font-family: var(--mono); font-weight: 600; font-size: 12px; letter-spacing: 0.06em;
 }
-.irs--shiny .irs-from:before, .irs--shiny .irs-to:before,
-.irs--shiny .irs-single:before { border-top-color: var(--info); }
+.irs--shiny .irs-from:before, .irs--shiny .irs-to:before, .irs--shiny .irs-single:before { display: none; }
 .irs--shiny .irs-min, .irs--shiny .irs-max {
-  background: transparent; color: var(--ink-faint);
-  font-family: var(--mono); font-size: 10px;
+  background: transparent; color: var(--ink-3); font-family: var(--mono); font-size: 10px;
 }
-.irs--shiny .irs-grid-text { color: var(--ink-faint); font-family: var(--mono); }
 
 /* --------------------------------------------------------------------------
-   Boxes — a rule, not a coloured header bar
+   THE PANEL — a hairline frame with its label cut into the top edge
    -------------------------------------------------------------------------- */
 
-.box {
-  background: var(--surface) !important;
-  border: 1px solid var(--rule) !important;
-  border-top: none !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-  margin-bottom: 16px;
+.pnl {
+  border: 1px solid var(--line);
+  background: transparent;
+  margin: 0 0 18px;
   position: relative;
 }
 
-/* The accent lives here: a 2px rule across the top edge. AdminLTE's solid
-   coloured header is replaced entirely, so the box announces its role without
-   competing with the map for saturation. */
-.box::before {
-  content: ""; position: absolute; top: 0; left: 0; right: 0;
-  height: 2px; background: var(--rule-strong);
+/* Two corner ticks. The scan terminal's bracket, reduced to the two corners
+   that are enough to establish a rectangle. */
+.pnl::before, .pnl::after {
+  content: ""; position: absolute; width: 7px; height: 7px;
+  border-color: var(--line-hot); border-style: solid; pointer-events: none;
 }
-.box.box-primary::before { background: var(--info); }
-.box.box-info::before    { background: var(--info); }
-.box.box-success::before { background: var(--good); }
-.box.box-warning::before { background: var(--warn); }
-.box.box-danger::before  { background: var(--bad); }
+.pnl::before { top: -1px; left: -1px; border-width: 1px 0 0 1px; }
+.pnl::after  { bottom: -1px; right: -1px; border-width: 0 1px 1px 0; }
 
-.box > .box-header,
-.box.box-solid > .box-header {
-  background: transparent !important;
+.pnl-head {
+  display: flex; align-items: center; gap: 10px;
+  margin-top: -8px; padding: 0 14px;
+}
+.pnl-label {
+  font-family: var(--mono); font-size: 10px; font-weight: 500;
+  letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-3);
+  background: var(--void); padding: 0 8px; white-space: nowrap;
+}
+.pnl-rule { flex: 1 1 auto; height: 1px; }
+.pnl-num {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em;
+  color: var(--ink-3); background: var(--void); padding: 0 8px;
+}
+.pnl-body { padding: 14px; }
+
+.pnl.t-live .pnl-label { color: var(--live); }
+
+/* Folded panels use <details>, so open/closed costs no reactive dependency. */
+.pnl-fold > summary { list-style: none; cursor: pointer; }
+.pnl-fold > summary::-webkit-details-marker { display: none; }
+.pnl-fold > summary .pnl-rule::after {
+  content: "[ + ]"; float: right; font-size: 10px; color: var(--ink-3);
+  background: var(--void); padding: 0 6px; letter-spacing: 0.05em;
+  position: relative; top: -8px;
+}
+.pnl-fold[open] > summary .pnl-rule::after { content: "[ \2212 ]"; }
+.pnl-fold > summary:hover .pnl-label { color: var(--live); }
+
+/* --------------------------------------------------------------------------
+   THE READOUT —  KEY .................... VALUE
+   -------------------------------------------------------------------------- */
+
+.ro { display: flex; align-items: baseline; padding: 3px 0; font-family: var(--mono); }
+.ro-k {
+  font-size: 10px; letter-spacing: 0.13em; text-transform: uppercase;
+  color: var(--ink-3); white-space: nowrap; flex: 0 0 auto;
+}
+/* Drawn, not typed: no line has to be padded by hand, and the value stays
+   right-aligned however long the key runs. */
+.ro-d {
+  flex: 1 1 auto; margin: 0 9px; min-width: 14px;
+  border-bottom: 1px dotted var(--line-hot); transform: translateY(-4px);
+}
+.ro-v { font-size: 12.5px; color: var(--ink); white-space: nowrap; flex: 0 0 auto; }
+.ro.t-live .ro-v { color: var(--live); }
+.ro.t-null .ro-v { color: var(--ink-3); }
+
+/* The status strip. Four value boxes reduced to one 44px line — the whole
+   point of the exercise: 200px of vertical space returned to the map. */
+.ro-strip {
+  display: flex; align-items: stretch; flex-wrap: wrap;
+  border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+  margin: 0 0 18px;
+}
+.ro-strip .ro {
+  flex: 1 1 190px; padding: 11px 18px; border-left: 1px solid var(--line);
+}
+.ro-strip .ro:first-child { border-left: 0; padding-left: 0; }
+.ro-strip .ro-v { font-size: 15px; font-weight: 500; }
+
+/* --------------------------------------------------------------------------
+   FOLDED NOTE — one line visible, the reasoning one click away
+   -------------------------------------------------------------------------- */
+
+.fold {
+  border-left: 1px solid var(--line-hot);
+  padding: 0 0 0 13px; margin: 0 0 16px;
+}
+.fold > summary {
+  list-style: none; cursor: pointer;
+  font-size: 12.5px; color: var(--ink-2); padding: 2px 0;
+}
+.fold > summary::-webkit-details-marker { display: none; }
+.fold > summary::after {
+  content: " [ + ]"; color: var(--ink-3); font-size: 10px; letter-spacing: 0.05em;
+}
+.fold[open] > summary::after { content: " [ \2212 ]"; }
+.fold > summary:hover, .fold[open] > summary { color: var(--ink); }
+.fold-body {
+  padding: 9px 0 4px; color: var(--ink-2); font-size: 12px; max-width: 82ch;
+}
+
+/* --------------------------------------------------------------------------
+   POLICY CALENDAR — one line per event
+   -------------------------------------------------------------------------- */
+/* The category keeps its own colour here, and that is the one deliberate
+   exception to the eight-value rule: these hues come from policy_timeline.json
+   and are a second categorical scale, never drawn on the map, so they cannot be
+   confused with a sector. */
+
+.ev { padding: 0 0 0 11px; margin: 0 0 3px; }
+.ev > summary {
+  list-style: none; cursor: pointer; padding: 6px 0;
+  display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap;
+}
+.ev > summary::-webkit-details-marker { display: none; }
+.ev-date { font-size: 11px; color: var(--ink-3); white-space: nowrap; }
+.ev-cat {
+  font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase;
+  border: 1px solid; padding: 0 5px; white-space: nowrap;
+}
+.ev-title { font-size: 12.5px; color: var(--ink); font-weight: 500; flex: 1 1 200px; }
+.ev-flag {
+  font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--ink-3);
+}
+.ev > summary::after { content: "[ + ]"; font-size: 10px; color: var(--ink-3); }
+.ev[open] > summary::after { content: "[ \2212 ]"; }
+.ev > summary:hover .ev-title { color: var(--live); }
+.ev-body {
+  font-size: 12px; color: var(--ink-2); padding: 0 0 10px; max-width: 78ch;
+}
+
+/* --------------------------------------------------------------------------
+   Tables and figures
+   -------------------------------------------------------------------------- */
+
+table { width: 100%; border-collapse: collapse; }
+table th {
+  font-family: var(--mono); font-size: 10px; font-weight: 500;
+  letter-spacing: 0.13em; text-transform: uppercase; text-align: left;
+  color: var(--ink-3) !important;
+  border-bottom: 1px solid var(--line-hot) !important;
+  border-top: 0 !important; padding: 6px 10px 6px 0;
+}
+table td {
+  border-bottom: 1px solid var(--line) !important;
+  border-top: 0 !important; padding: 6px 10px 6px 0; font-size: 12px;
+}
+table.kv td { padding: 4px 12px 4px 0; border: 0 !important; }
+table.kv td:first-child {
+  font-size: 10px; letter-spacing: 0.13em; text-transform: uppercase;
+  color: var(--ink-3); white-space: nowrap; vertical-align: top; padding-top: 6px;
+}
+table.kv td:last-child { color: var(--ink); }
+
+/* A word, not a colour — except "observed", the one live state on the page.
+   The default badge is an outline: a projection is dimmer than an observation,
+   never a different hue, because a hue here would be a ninth data colour. */
+.yr-badge {
+  display: inline-block; padding: 1px 7px; border: 1px solid var(--line-hot);
+  border-radius: 0; font-family: var(--mono); font-size: 10px;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--ink-2); background: transparent;
+}
+.yr-badge.is-live {
+  background: var(--live); border-color: var(--live); color: var(--void);
+  font-weight: 600;
+}
+.yr-badge.is-projected { color: var(--ink-3); border-style: dashed; }
+
+/* The sector chip in the facility panel. This one IS allowed a fill, because
+   it carries a sector colour — the same value the marker on the map carries,
+   and the only place chrome and data are deliberately the same. */
+.sector-chip {
+  display: inline-block; padding: 2px 9px; border-radius: 0;
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em;
+  color: var(--void); font-weight: 600;
+}
+
+/* --------------------------------------------------------------------------
+   Leaflet — the one element with a floor under it
+   -------------------------------------------------------------------------- */
+
+.leaflet-container { background: #0B1014; }
+
+.leaflet-control .legend, .leaflet-bottom .info.legend {
+  background: rgba(5, 7, 10, 0.93) !important;
   color: var(--ink) !important;
-  border-bottom: 1px solid var(--rule);
-  padding: 14px 16px 10px;
+  border: 1px solid var(--line-hot) !important; border-radius: 0;
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.04em; line-height: 1.7;
+}
+.leaflet-control .legend strong {
+  color: var(--ink-3); font-size: 9px; letter-spacing: 0.16em;
+  text-transform: uppercase; font-weight: 500;
 }
 
-.box > .box-header .box-title,
-.box.box-solid > .box-header .box-title {
-  font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.11em;
-  text-transform: uppercase;
-  color: var(--ink-soft);
+.leaflet-popup-content-wrapper, .leaflet-popup-tip {
+  background: var(--void); color: var(--ink);
+  border: 1px solid var(--line-hot); border-radius: 0; box-shadow: none;
 }
+.leaflet-popup-content { font-family: var(--mono); font-size: 11.5px; }
+.leaflet-popup-content b { color: #FFFFFF; }
+.leaflet-popup-close-button { color: var(--ink-3) !important; }
 
-.box > .box-header .box-tools .btn {
-  background: transparent !important;
-  color: var(--ink-faint) !important;
-  box-shadow: none !important;
+.leaflet-tooltip {
+  background: rgba(5, 7, 10, 0.95); color: var(--ink);
+  border: 1px solid var(--line-hot); border-radius: 0;
+  font-family: var(--mono); font-size: 10.5px; box-shadow: none;
 }
-.box > .box-header .box-tools .btn:hover { color: var(--ink) !important; }
+.leaflet-tooltip-left:before  { border-left-color: var(--line-hot); }
+.leaflet-tooltip-right:before { border-right-color: var(--line-hot); }
 
-.box-body { color: var(--ink); padding: 16px; }
-.box-body b, .box-body strong { color: var(--ink); }
+.leaflet-bar a {
+  background: var(--void) !important; color: var(--ink-2) !important;
+  border-color: var(--line-hot) !important; border-radius: 0 !important;
+}
+.leaflet-bar a:hover { color: var(--live) !important; }
+.leaflet-control-attribution {
+  background: rgba(5, 7, 10, 0.85) !important; color: var(--ink-3) !important;
+  font-family: var(--mono); font-size: 9px;
+}
+.leaflet-control-attribution a { color: var(--ink-3) !important; }
 
-/* The map holds its position while the detail column scrolls past it.
-   Two rules, and both are needed. The flex row makes the left column as tall as
-   the right one — Bootstrap 3 floats its columns, so without this the left
-   column ends where the map ends and a sticky child has zero travel. The sticky
-   child then rides down it.
-   Only above 1200px: below that the columns stack, and a sticky map would pin
-   itself over the very content the user scrolled down to read. */
+/* Corner tags on the map frame — the poster's small labels, carrying real
+   values rather than decoration. */
+.map-wrap { position: relative; }
+.map-tag {
+  position: absolute; z-index: 500; pointer-events: none;
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.16em;
+  text-transform: lowercase; color: var(--ink-3);
+}
+.map-tag.tr { top: 12px; right: 16px; }
+.map-tag.bl { bottom: 34px; left: 16px; }
+
+/* --------------------------------------------------------------------------
+   Layout
+   -------------------------------------------------------------------------- */
+
 @media (min-width: 1200px) {
-  /* AdminLTE sets overflow-x:hidden on .wrapper to swallow the horizontal
-     overflow its sidebar transition produces. That makes .wrapper a scroll
-     container, and a sticky element then sticks to IT rather than to the
-     viewport — which, since .wrapper does not itself scroll, means it never
-     sticks at all. Measured: with this override the map holds at the top of the
-     viewport and the document gains no horizontal scroll on any tab. */
+  /* AdminLTE sets overflow-x:hidden on .wrapper to swallow the sidebar
+     transition's overflow. That makes .wrapper a scroll container, and a sticky
+     element then sticks to something that never scrolls. Measured: with this
+     override the map holds position and no tab gains horizontal scroll. */
   .wrapper { overflow: visible; }
   .sticky-row { display: flex; align-items: stretch; }
   .sticky-row > [class*="col-"] { float: none; }
-  .sticky-map { position: sticky; top: 12px; z-index: 2; }
+  .sticky-map { position: sticky; top: 14px; z-index: 2; }
 }
+
+/* Shiny's default 15px gutters read as accidental gaps on a page built out of
+   hairlines. */
+.content { padding: 20px 20px 0; }
+.row { margin-left: -9px; margin-right: -9px; }
+.row > [class*="col-"] { padding-left: 9px; padding-right: 9px; }
 
 /* --------------------------------------------------------------------------
-   Value boxes — the figure carries the weight, not the fill
+   Scrollbars
    -------------------------------------------------------------------------- */
 
-.small-box {
-  background: var(--surface) !important;
-  border: 1px solid var(--rule);
-  border-radius: 0 !important;
-  box-shadow: none !important;
-  color: var(--ink) !important;
-  position: relative;
-  overflow: hidden;
-  padding-top: 4px;
-}
-
-/* The colour class becomes a 3px left rule instead of a saturated block. */
-.small-box::after {
-  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
-  background: var(--rule-strong);
-}
-.small-box.bg-red::after,    .small-box.bg-maroon::after  { background: var(--bad); }
-.small-box.bg-blue::after,   .small-box.bg-aqua::after    { background: var(--info); }
-.small-box.bg-green::after,  .small-box.bg-teal::after    { background: var(--good); }
-.small-box.bg-orange::after, .small-box.bg-yellow::after  { background: var(--warn); }
-.small-box.bg-olive::after,  .small-box.bg-purple::after  { background: var(--projected); }
-.small-box.bg-black::after                                { background: var(--ink-faint); }
-
-.small-box, .small-box.bg-red, .small-box.bg-blue, .small-box.bg-green,
-.small-box.bg-aqua, .small-box.bg-teal, .small-box.bg-orange,
-.small-box.bg-yellow, .small-box.bg-olive, .small-box.bg-purple,
-.small-box.bg-black, .small-box.bg-maroon {
-  background: var(--surface) !important;
-}
-
-.small-box h3 {
-  font-family: var(--sans) !important;
-  font-size: 30px !important;
-  font-weight: 600 !important;
-  letter-spacing: -0.02em;
-  color: var(--ink) !important;
-  margin: 8px 0 2px 12px !important;
-}
-
-.small-box p {
-  font-family: var(--mono) !important;
-  font-size: 10.5px !important;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--ink-faint) !important;
-  margin-left: 12px !important;
-  line-height: 1.5;
-}
-
-/* The icon is atmosphere, not information. Pushed back until it is texture. */
-.small-box .icon {
-  color: var(--ink) !important;
-  opacity: 0.05 !important;
-  font-size: 62px !important;
-  top: 8px; right: 10px;
-  transition: none;
-}
-.small-box:hover .icon { opacity: 0.08 !important; }
-
-/* --------------------------------------------------------------------------
-   Standing notices — part of the composition, not warnings bolted on
-   -------------------------------------------------------------------------- */
-
-.estimate-note, .basis-note, .projection-note, .partial-note {
-  border-radius: 0;
-  border-left-width: 3px;
-  font-size: 13px;
-  line-height: 1.6;
-  padding: 12px 16px;
-  margin-bottom: 14px;
-}
-.estimate-note   { background: #1C1608; border-left-color: var(--warn);      color: #E8D9BC; }
-.basis-note      { background: #0B1B24; border-left-color: var(--info);      color: #C3DCE8; }
-.projection-note { background: #1A1026; border-left-color: var(--projected); color: #DCCBF0; }
-.partial-note    { background: #1C1608; border-left-color: var(--warn);      color: #E8D9BC; }
-.estimate-note strong, .basis-note strong,
-.projection-note strong, .partial-note strong { color: #FFF; }
-
-/* A projection must never look like an observation (§5). The badge is
-   deliberately loud: it is easier to ignore a colour than a word. Its colours
-   are set per-badge in server.R; only the shape is decided here. */
-.yr-badge {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 0;
-  font-family: var(--mono);
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-}
-
-/* --------------------------------------------------------------------------
-   Tables and small type
-   -------------------------------------------------------------------------- */
-
-table.kv td { padding: 5px 12px 5px 0; font-size: 13px; color: var(--ink-soft); }
-table.kv td:last-child { color: var(--ink); }
-/* The key column is a label, so it is set like every other label on the page. */
-table.kv td:first-child {
-  font-family: var(--mono);
-  font-size: 10.5px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--ink-faint);
-  white-space: nowrap;
-  vertical-align: top;
-  padding-top: 7px;
-}
-
-.box-body table th {
-  font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: var(--ink-faint) !important;
-  border-bottom-color: var(--rule-strong) !important;
-}
-.box-body table td { border-bottom-color: var(--rule) !important; }
-
-code {
-  background: var(--surface-3);
-  color: var(--info);
-  border-radius: 0;
-  padding: 1px 5px;
-  font-family: var(--mono);
-  font-size: 0.86em;
-}
-
-a { color: var(--info); }
-a:hover, a:focus { color: #7FDCF7; }
-:focus-visible { outline: 2px solid var(--info); outline-offset: 2px; }
-
-hr { border-color: var(--rule); }
-
-/* --------------------------------------------------------------------------
-   Leaflet — the map is the lit panel; its furniture must not be white
-   -------------------------------------------------------------------------- */
-
-.leaflet-container { background: #0E1418; }
-
-.leaflet-control .legend,
-.leaflet-bottom .info.legend {
-  background: rgba(10, 14, 17, 0.9) !important;
-  color: var(--ink) !important;
-  border: 1px solid var(--rule-strong) !important;
-  border-radius: 0;
-  font-family: var(--mono);
-  font-size: 11px;
-  line-height: 1.6;
-}
-.leaflet-control .legend strong { color: var(--ink); letter-spacing: 0.08em; }
-
-.leaflet-popup-content-wrapper, .leaflet-popup-tip {
-  background: var(--surface-2); color: var(--ink);
-  border-radius: 0;
-  box-shadow: 0 4px 20px rgba(0,0,0,.6);
-}
-.leaflet-popup-content-wrapper a { color: var(--info); }
-.leaflet-popup-content b { color: #FFF; }
-
-.leaflet-tooltip {
-  background: rgba(10,14,17,.94); color: var(--ink);
-  border: 1px solid var(--rule-strong); border-radius: 0;
-  font-family: var(--mono); font-size: 11px;
-}
-.leaflet-tooltip-left:before  { border-left-color: var(--rule-strong); }
-.leaflet-tooltip-right:before { border-right-color: var(--rule-strong); }
-
-.leaflet-bar a {
-  background: var(--surface-2) !important;
-  color: var(--ink) !important;
-  border-color: var(--rule-strong) !important;
-  border-radius: 0 !important;
-}
-.leaflet-bar a:hover { background: var(--surface-3) !important; }
-.leaflet-control-attribution {
-  background: rgba(10,14,17,.8) !important;
-  color: var(--ink-faint) !important;
-  font-size: 10px;
-}
-.leaflet-control-attribution a { color: var(--ink-soft) !important; }
-
-/* --------------------------------------------------------------------------
-   Scrollbars, so the dark surface holds to the edge of the window
-   -------------------------------------------------------------------------- */
-
-* { scrollbar-color: var(--rule-strong) var(--ground); scrollbar-width: thin; }
-::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-track { background: var(--ground); }
-::-webkit-scrollbar-thumb { background: var(--rule-strong); border: 2px solid var(--ground); }
-::-webkit-scrollbar-thumb:hover { background: #3D4C57; }
-
-/* --------------------------------------------------------------------------
-   Motion
-   -------------------------------------------------------------------------- */
+* { scrollbar-color: var(--line-hot) var(--void); scrollbar-width: thin; }
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-track { background: var(--void); }
+::-webkit-scrollbar-thumb { background: var(--line-hot); border: 2px solid var(--void); }
+::-webkit-scrollbar-thumb:hover { background: var(--ink-3); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }

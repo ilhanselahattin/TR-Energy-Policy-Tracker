@@ -154,6 +154,46 @@ test_that("the interface theme is legible on its own ground", {
 })
 
 
+test_that("the chrome accent is not one of the data hues", {
+  # The whole chrome palette is one saturated value, --live, and it was chosen
+  # by measuring which hue angles the eight sector colours leave free. Every
+  # obvious candidate failed: phosphor green sits 10 degrees from
+  # oil-and-gas-production, CRT amber 1 degree from aluminum, electric blue 15
+  # degrees from oil-and-gas-refining, and the cyan this project shipped for one
+  # commit WAS electricity-generation's colour exactly.
+  #
+  # This is not a style assertion. An accent that lands on a sector hue makes
+  # the frames and labels argue with the map: the reader cannot tell whether a
+  # green thing is a state or a gas facility.
+  css_path <- file.path(ROOT, "app", "www", "atlas.css")
+  skip_if_not(file.exists(css_path), "atlas.css not present")
+
+  css  <- readLines(css_path, encoding = "UTF-8", warn = FALSE)
+  line <- grep("^\\s*--live:", css, value = TRUE)[1]
+  expect_false(is.na(line))
+  live <- sub(".*:\\s*(#[0-9A-Fa-f]{6}).*", "\\1", line)
+
+  e <- .app_env()
+  h <- function(x) grDevices::rgb2hsv(grDevices::col2rgb(x))[1, ] * 360
+  s <- function(x) grDevices::rgb2hsv(grDevices::col2rgb(x))[2, ] * 100
+
+  lh <- h(live)
+  for (nm in names(e$SECTOR_COLOURS)) {
+    col <- e$SECTOR_COLOURS[[nm]]
+    # A near-neutral sector (coal mining, 8% saturation) cannot be confused
+    # with a saturated accent whatever its hue angle, so it is exempt.
+    if (s(col) < 20) next
+    d <- min(abs(h(col) - lh), 360 - abs(h(col) - lh))
+    expect_gte(d, 25,
+               label = paste0("--live (", live, ") is ", round(d),
+                              " deg from ", nm, " (", col, ")"))
+  }
+
+  # And it has to survive on the ground it is drawn on.
+  expect_gte(.contrast_ratio(live, "#05070A"), 4.5)
+})
+
+
 test_that("the plot constants still match the tokens in atlas.css", {
   # PLOT_* duplicates values that atlas.css declares as custom properties,
   # because base graphics cannot read CSS. Duplication that nothing checks
@@ -171,12 +211,12 @@ test_that("the plot constants still match the tokens in atlas.css", {
     toupper(sub(".*:\\s*(#[0-9A-Fa-f]{6}).*", "\\1", line))
   }
 
-  expect_equal(token("surface"),     toupper(e$PLOT_BG))
-  expect_equal(token("ink"),         toupper(e$PLOT_INK))
-  expect_equal(token("ink-soft"),    toupper(e$PLOT_SOFT))
-  expect_equal(token("ink-faint"),   toupper(e$PLOT_FAINT))
-  expect_equal(token("rule"),        toupper(e$PLOT_RULE))
-  expect_equal(token("rule-strong"), toupper(e$PLOT_AXIS))
+  expect_equal(token("void"),     toupper(e$PLOT_BG))
+  expect_equal(token("ink"),      toupper(e$PLOT_INK))
+  expect_equal(token("ink-2"),    toupper(e$PLOT_SOFT))
+  expect_equal(token("ink-3"),    toupper(e$PLOT_FAINT))
+  expect_equal(token("line"),     toupper(e$PLOT_RULE))
+  expect_equal(token("line-hot"), toupper(e$PLOT_AXIS))
 })
 
 

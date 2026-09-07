@@ -4,7 +4,7 @@
 this file says where it *got to*, what runs, what is blocked, and which traps have already
 been paid for.
 
-Last updated: **2026-09-07** · 48 commits · **~78% complete** · 313 assertions passing
+Last updated: **2026-09-07** · 49 commits · **~78% complete** · 322 assertions passing
 
 > The figure moved 53% → 35% → 58% → 69% → 72% → 76% → 75%. Both falls are denominator
 > corrections, not lost work: the 2026-08-19 scope merge, and then finding on 2026-09-01
@@ -110,7 +110,7 @@ ratios are **recomputed from annual totals** rather than averaged across months.
 | Grid emission factor | 6 | ◐ 60% — three estimates assembled, selection pending |
 | `eu_export_share` | 4 | ◐ 50% — fetch works, definition pending |
 | App phase 2 (slider, cost, energy layer, audit trail) | 8 | ◐ 80% — both time axes, emissions-scaled markers, projection styling, two series charts and the coverage band are in; no cost layer or audit-trail panel, both blocked on B9 |
-| Interface theme (`app/www/atlas.css`) | 2 | ✅ — IBM Plex Sans/Mono, one dark palette across chrome, plots and leaflet, sticky map, `lang="tr"` casing |
+| Interface theme (`app/www/atlas.css`) | 2 | ✅ — scan-readout-on-poster language: hairline frames, dotted-leader readouts, folded notes, one accent measured free of the sector hues |
 | Energy emissions panel | 6 | ✅ |
 | `facility_panel.rds` (industrial) | 8 | ◐ 65% — built, gated and tested; `co2_direct_t` / `co2_indirect_t` await B1 |
 | CBAM calculation core | 8 | ❌ |

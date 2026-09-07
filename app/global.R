@@ -205,12 +205,12 @@ GEOCODE_BADGE <- c(
 # panel on a dark page is the single loudest thing on the screen, and it would
 # be brighter than the map — which is the one element that is supposed to hold
 # attention.
-PLOT_BG    <- "#12181D"   # --surface
-PLOT_INK   <- "#E4E9EC"   # --ink
-PLOT_SOFT  <- "#93A1AB"   # --ink-soft
-PLOT_FAINT <- "#5F6C75"   # --ink-faint
-PLOT_RULE  <- "#212B33"   # --rule
-PLOT_AXIS  <- "#2E3A44"   # --rule-strong
+PLOT_BG    <- "#05070A"   # --void      (plots sit on the page, not on a card)
+PLOT_INK   <- "#E8EDF0"   # --ink
+PLOT_SOFT  <- "#8DA0AD"   # --ink-2
+PLOT_FAINT <- "#55646F"   # --ink-3
+PLOT_RULE  <- "#1C242B"   # --line
+PLOT_AXIS  <- "#2E3A44"   # --line-hot
 
 # The two gas bases carry the two ends of the semantic palette. They are drawn
 # on separate axes and must never be read as summable (§6), so they are given
@@ -626,3 +626,94 @@ FLEET_COLOURS <- c(
   "geothermal"          = "#FF8AC4",
   "nuclear"             = "#B197E8"
 )
+
+
+# =============================================================================
+# 11. INTERFACE VOCABULARY
+# =============================================================================
+# The interface speaks in three shapes, and they are constructors rather than
+# inline markup because they appear at forty call sites and drifted the last
+# time they were written by hand.
+#
+# The shapes come from the two references the design follows. The frame and its
+# riding label are the poster's scaffolding — a hairline rectangle with a small
+# tag hung on its top edge, no fill, no shadow, no header bar. The readout and
+# the leader dots are the scan terminal's — `KEY .......... VALUE`, which lets
+# a column of unrelated quantities line up without a table and without rules.
+#
+# Nothing here sets a colour. Every colour lives in atlas.css.
+
+#' A hairline frame with a label riding on its top edge.
+#'
+#' Replaces shinydashboard's box(). A box paints a solid coloured header bar,
+#' which put four saturated blocks in competition with the map; this paints
+#' nothing and states its name in the smallest type on the page.
+#'
+#' @param label Turkish panel name, rendered uppercase by CSS.
+#' @param num   Optional two-digit index shown at the frame's top-right, the
+#'   poster's numbering device. Purely positional — it is not an identifier.
+#' @param tone  NULL, "live", "warn" or "bad". Tints the label and the frame's
+#'   top edge only; never the fill.
+#' @param fold  If TRUE the frame's body collapses, closed by default.
+atlas_panel <- function(..., label = NULL, num = NULL, tone = NULL,
+                        fold = FALSE, open = FALSE, class = NULL) {
+  head <- tags$div(
+    class = "pnl-head",
+    if (!is.null(label)) tags$span(class = "pnl-label", label),
+    tags$span(class = "pnl-rule"),
+    if (!is.null(num)) tags$span(class = "pnl-num", num)
+  )
+  body <- tags$div(class = "pnl-body", ...)
+
+  tags$section(
+    class = paste(c("pnl", if (!is.null(tone)) paste0("t-", tone), class),
+                  collapse = " "),
+    if (fold) {
+      # <details> rather than a Shiny input: the open/closed state is pure
+      # presentation, and routing it through the server would put a reactive
+      # dependency on something no computation reads.
+      tags$details(class = "pnl-fold", open = if (open) NA else NULL,
+                   tags$summary(head), body)
+    } else {
+      tagList(head, body)
+    }
+  )
+}
+
+#' One line of a scan readout: a key, a run of leader dots, a value.
+#'
+#' The dots are drawn by CSS, not typed, so the value stays right-aligned
+#' whatever the key's length and no line has to be padded by hand.
+#'
+#' @param tone NULL, "live", "warn", "bad" or "null". "null" is for a quantity
+#'   that is deliberately absent — it renders the value dimmed, so an em dash
+#'   never reads as a zero.
+readout <- function(key, value, tone = NULL) {
+  tags$div(
+    class = paste(c("ro", if (!is.null(tone)) paste0("t-", tone)),
+                  collapse = " "),
+    tags$span(class = "ro-k", key),
+    tags$span(class = "ro-d"),
+    tags$span(class = "ro-v", value)
+  )
+}
+
+#' A horizontal strip of readouts. The map tab's four value boxes collapse into
+#' one of these, which is 200px of vertical space returned to the map.
+readout_strip <- function(...) tags$div(class = "ro-strip", ...)
+
+#' One visible line, the rest behind a disclosure triangle.
+#'
+#' The project's standing warnings are not decoration — an emissions figure that
+#' is not marked as modelled is a false claim (§8.3) — but the fleet tab carried
+#' 835 words across eight blocks, which is an essay rather than a caption. The
+#' warning stays on screen; its reasoning moves one click away.
+#'
+#' @param head The sentence that must be readable without any interaction.
+fold_note <- function(head, ..., tone = "note") {
+  tags$details(
+    class = paste0("fold fold-", tone),
+    tags$summary(tags$span(class = "fold-head", head)),
+    tags$div(class = "fold-body", ...)
+  )
+}
