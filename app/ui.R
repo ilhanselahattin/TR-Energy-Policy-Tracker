@@ -187,6 +187,24 @@ dashboardPage(
       # it runs before the body is parsed and there is no flash.
       tags$script(HTML("document.documentElement.lang = 'tr';")),
 
+      # A tab icon, inline so it costs no file and no request. The mark is the
+      # header's full stop — the one saturated value in the interface — on the
+      # page's own ground. Without this the browser asks for /favicon.ico,
+      # gets a 404, and the tab shows a blank sheet.
+      tags$link(
+        rel  = "icon",
+        type = "image/svg+xml",
+        href = paste0(
+          "data:image/svg+xml,",
+          utils::URLencode(paste0(
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">',
+            '<rect width="32" height="32" fill="#05070A"/>',
+            '<circle cx="16" cy="16" r="7" fill="#C8FF00"/>',
+            '</svg>'
+          ), reserved = TRUE)
+        )
+      ),
+
       # Two families, one job each. Inter Tight is the poster layer — the
       # header, and nothing else. IBM Plex Mono carries every label, figure and
       # sentence, which is what makes the page read as instrumentation rather

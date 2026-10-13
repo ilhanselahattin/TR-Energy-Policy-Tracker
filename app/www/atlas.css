@@ -116,11 +116,33 @@ code {
 }
 .skin-black .main-header .logo::after { content: "."; color: var(--live); }
 
+/* The sidebar toggle is the last icon in the interface, and it was rendering as
+   a missing-glyph box: AdminLTE draws it from Font Awesome, which this app does
+   not serve (the redesign removed every other icon, so nothing else pulled the
+   font in and the one remaining call failed silently on a 404). Drawn here
+   instead, out of two rules and a border — no font dependency, and it matches
+   the hairline language of everything around it. */
 .skin-black .main-header .navbar .sidebar-toggle {
-  color: var(--ink-3) !important; font-size: 13px; line-height: 62px; height: 62px;
+  color: transparent !important;
+  font-size: 0 !important;
+  line-height: 62px; height: 62px; width: 46px;
+  position: relative;
 }
-.skin-black .main-header .navbar .sidebar-toggle:hover {
-  background: transparent !important; color: var(--live) !important;
+/* AdminLTE puts a real <i class="fa fa-bars"> inside the anchor as well as
+   styling the anchor itself, so hiding one and not the other left the glyph's
+   three bars stacked on top of the two drawn here. Hide the child, and draw
+   all three bars from one pseudo-element. */
+.skin-black .main-header .navbar .sidebar-toggle > i,
+.skin-black .main-header .navbar .sidebar-toggle > svg { display: none !important; }
+.skin-black .main-header .navbar .sidebar-toggle::before {
+  content: ""; position: absolute; left: 14px; top: 26px;
+  width: 18px; height: 1px; background: var(--ink-3);
+  box-shadow: 0 5px 0 var(--ink-3), 0 10px 0 var(--ink-3);
+}
+.skin-black .main-header .navbar .sidebar-toggle::after { content: none; }
+.skin-black .main-header .navbar .sidebar-toggle:hover { background: transparent !important; }
+.skin-black .main-header .navbar .sidebar-toggle:hover::before {
+  background: var(--live); box-shadow: 0 5px 0 var(--live), 0 10px 0 var(--live);
 }
 
 /* --------------------------------------------------------------------------
