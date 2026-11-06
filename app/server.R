@@ -164,9 +164,12 @@ function(input, output, session) {
   # The two populations get their own box each, because their figures are in
   # different gases and a combined total would be meaningless (§6).
 
+  # Every figure goes through fmt_tr() (global.R): a Turkish reader takes
+  # "74.9" for seventy-four thousand nine hundred, so English marks are a wrong
+  # number, not a style difference.
   fmt_mt <- function(t) {
     if (all(is.na(t))) return("—")
-    paste0(format(round(sum(t, na.rm = TRUE) / 1e6, 1), nsmall = 1), " Mt")
+    paste0(fmt_tr(sum(t, na.rm = TRUE) / 1e6, 1), " Mt")
   }
 
   # The four value boxes, now one line. Same four quantities; what changed is
@@ -214,6 +217,20 @@ function(input, output, session) {
   # ===========================================================================
   # 3. MAP
   # ===========================================================================
+
+  # Place names sit ABOVE the facility markers, so a city name is never buried
+  # under a dot. They live in their own pane (z 450, over the overlay pane's
+  # 400) and are added ONCE when the map is built. They used to be removed and
+  # re-added inside every marker observer, which re-requested the label tiles
+  # on each filter change and made the map flicker through every step of the
+  # slider animation. The pane is made click-through in ui.R.
+  add_place_labels <- function(map, maxZoom) {
+    map |>
+      addMapPane("place_labels", zIndex = 450) |>
+      addTiles(urlTemplate = ESRI_LABELS,
+               options = tileOptions(pane = "place_labels", minZoom = 5,
+                                     maxZoom = maxZoom, opacity = 0.9))
+  }
   # Rendered ONCE with a fixed view; markers are updated through leafletProxy
   # (§4). Re-rendering the whole map on every filter change would reset the
   # user's pan and zoom, which is both slow and infuriating.
@@ -235,6 +252,7 @@ function(input, output, session) {
       # why this is not CartoDB.
       addTiles(urlTemplate = ESRI_BASE, attribution = ESRI_ATTRIB,
                options = tileOptions(minZoom = 5, maxZoom = 14)) |>
+      add_place_labels(maxZoom = 14) |>
       fitBounds(lng1 = MAP_BOUNDS$lng1, lat1 = MAP_BOUNDS$lat1,
                 lng2 = MAP_BOUNDS$lng2, lat2 = MAP_BOUNDS$lat2) |>
       # A little slack beyond the data so coastal facilities are not pinned to
@@ -316,8 +334,8 @@ function(input, output, session) {
         dashArray    = dash,
         label        = ~paste0(facility_name_tr, " — ",
                                ifelse(is.na(emissions_reported_t), "veri yok",
-                                      paste0(format(round(emissions_reported_t / 1000, 1),
-                                                    nsmall = 1), " kt"))),
+                                      paste0(fmt_tr(emissions_reported_t / 1000, 1),
+                                             " kt"))),
         popup        = ~paste0(
           "<strong>", facility_name_tr, "</strong><br/>",
           "<em>", unname(SECTOR_LABELS[sector]), " · ",
@@ -325,7 +343,7 @@ function(input, output, session) {
 
           "<b>", yr, " emisyonu:</b> ",
           ifelse(is.na(emissions_reported_t), "veri yok",
-                 paste0(format(round(emissions_reported_t / 1000, 1), nsmall = 1),
+                 paste0(fmt_tr(emissions_reported_t / 1000, 1),
                         " kt ", unname(GAS_LABELS[gas_basis]))),
           ifelse(is.na(value_type), "",
                  paste0(" <span style='color:",
@@ -339,7 +357,7 @@ function(input, output, session) {
           "<br/>",
           "<b>Yoğunluk:</b> ",
           ifelse(is.na(emission_intensity), "hesaplanamıyor",
-                 format(round(emission_intensity, 3), nsmall = 3)),
+                 fmt_tr(emission_intensity, 3)),
           "<br/>",
           "<b>Güven (emisyon):</b> ",
           ifelse(is.na(confidence_emissions), "—", confidence_emissions),
@@ -352,12 +370,7 @@ function(input, output, session) {
           "<b>İl:</b> ", province_name_tr, " (", province_code, ")<br/>",
           "<b>Yükümlülük:</b> ", unname(LIABILITY_SHORT[liability_class])
         )
-      ) |>
-      # Place names go on top of the markers, not under them. Drawn here rather
-      # than with the base so the layer order survives every marker redraw.
-      clearGroup("labels") |>
-      addTiles(urlTemplate = ESRI_LABELS, group = "labels",
-               options = tileOptions(minZoom = 5, maxZoom = 14, opacity = 0.9))
+      )
   })
 
 
@@ -401,7 +414,7 @@ function(input, output, session) {
           "<strong>", plant_name, "</strong><br/>",
           "<em>", unname(FLEET_LABELS[fuel_type]), " — yenilenebilir filo</em>",
           "<br/><br/>",
-          "<b>Kapasite:</b> ", round(capacity_mw, 1), " MW",
+          "<b>Kapasite:</b> ", fmt_tr(capacity_mw, 1), " MW",
           ifelse(units > 1, paste0(" (", units, " ünite)"), ""), "<br/>",
           "<b>Devreye giriş:</b> ",
           ifelse(is.na(commissioning_year), "bilinmiyor", commissioning_year), "<br/>",
@@ -474,7 +487,11 @@ function(input, output, session) {
              xlim = range(yrs), ylim = c(0, max(d$mt) * 1.15),
              axes = FALSE, bty = "n")
       }
-      axis(side, col = colour, col.axis = colour)
+      # Tick labels in Turkish marks too; a single small facility puts
+      # decimals on this axis ("0,05", not "0.05").
+      tk <- axTicks(side)
+      axis(side, at = tk, labels = fmt_tr(tk, if (all(tk == round(tk))) 0 else 2),
+           col = colour, col.axis = colour)
       mtext(unname(GAS_LABELS[basis]), side = side, line = 2.4,
             col = colour, cex = 0.8)
 
@@ -621,9 +638,9 @@ function(input, output, session) {
             tags$table(
               class = "kv", style = "width:100%;",
               row("Emisyon",
-                  paste0(format(round(p$emissions_reported_t / 1000, 1),
-                                nsmall = 1),
-                         " kt ", GAS_LABELS[[p$gas_basis]])),
+                  if (is.na(p$emissions_reported_t)) "veri yok"
+                  else paste0(fmt_tr(p$emissions_reported_t / 1000, 1),
+                              " kt ", GAS_LABELS[[p$gas_basis]])),
               row("Üretim",
                   if (is.na(p$production_activity)) "yayımlanmıyor"
                   else paste0(fmt_tr(p$production_activity), " ",
@@ -631,7 +648,7 @@ function(input, output, session) {
                                      p$activity_units))),
               row("Yoğunluk",
                   if (is.na(p$emission_intensity)) "hesaplanamıyor"
-                  else format(round(p$emission_intensity, 3), nsmall = 3)),
+                  else fmt_tr(p$emission_intensity, 3)),
               row("Güven", ifelse(is.na(p$confidence_emissions), "—",
                                   p$confidence_emissions)),
               row("Sürüm", p$vintage)
@@ -724,8 +741,8 @@ function(input, output, session) {
           )
         } else {
           named <- rows[rows$is_named_entity, ]
-          named <- named[order(-named$path_terminal_unknown * 0 +
-                                 named$path_terminal_unknown,
+          # Quantified chains first, then by share, largest first.
+          named <- named[order(named$path_terminal_unknown,
                                -coalesce(named$share_pct_unreliable, -1)), ]
           tags$div(
             style = "margin-top:12px; padding:10px 12px; background:var(--panel); border:1px solid var(--line);",
@@ -747,7 +764,7 @@ function(input, output, session) {
                     tags$span(style = "color:var(--ink-3);", " · ", r$parent_hq_country),
                   if (!is.na(r$share_pct_unreliable))
                     tags$span(style = "color:var(--ink-3);",
-                              " · %", round(r$share_pct_unreliable, 1)),
+                              " · %", fmt_tr(r$share_pct_unreliable, 1)),
                   if (unk)
                     tags$span(style = "color:var(--ink); font-size:11px;",
                               " · son halka nicelendirilmemiş")
@@ -1003,7 +1020,7 @@ function(input, output, session) {
                     FLEET_LABELS[[ft]]),
             tags$td(style = "text-align:right;", by_fuel$plants[i]),
             tags$td(style = "text-align:right; font-weight:600;",
-                    paste0(round(by_fuel$gw[i], 1), " GW"))
+                    paste0(fmt_tr(by_fuel$gw[i], 1), " GW"))
           )
         }),
         tags$tr(
@@ -1012,7 +1029,7 @@ function(input, output, session) {
           tags$td(style = "text-align:right; padding-top:8px; border-top:1px solid var(--line);",
                   tags$b(nrow(fleet_renewables))),
           tags$td(style = "text-align:right; padding-top:8px; border-top:1px solid var(--line);",
-                  tags$b(paste0(round(sum(by_fuel$gw), 1), " GW")))
+                  tags$b(paste0(fmt_tr(sum(by_fuel$gw), 1), " GW")))
         )
       ),
       tags$p(
@@ -1040,46 +1057,48 @@ function(input, output, session) {
     if (is.null(input$fleet_year)) TIMELINE_DEFAULT else input$fleet_year
   }) |> debounce(250)
 
-  # Everything commissioned up to and including the selected year, from both
-  # registers, plus the undated facilities as their own state.
-  fleet_visible <- reactive({
-    req(!is.null(fleet_timeline))
-    yr <- fleet_year()
-
-    # Grouped exactly as 04_build_fleet_timeline.R groups them, so the map and
-    # the chart can never disagree about which population a facility is in.
-    ct <- facilities |>
+  # Both registers as one table, built once per session: none of it depends on
+  # an input. Grouped exactly as 04_build_fleet_timeline.R groups them, so the
+  # map and the chart can never disagree about which population a facility is
+  # in.
+  fleet_points <- bind_rows(
+    facilities |>
       transmute(
         name = facility_name_tr, lat, lon, commissioning_year,
-        detail = paste0(unname(SECTOR_LABELS[sector])),
+        detail = unname(SECTOR_LABELS[sector]),
         tl_group = case_when(
           asset_class == "industrial"        ~ "industrial",
           sector == "electricity-generation" ~ "ct_combustion",
           TRUE                               ~ "energy_other"),
-        mw = NA_real_)
-
-    ren <- if (!is.null(fleet_renewables)) {
+        mw = NA_real_),
+    if (!is.null(fleet_renewables)) {
       fleet_renewables |>
         transmute(name = plant_name, lat, lon, commissioning_year,
                   detail = unname(FLEET_LABELS[fuel_type]),
                   tl_group = "renewable",
                   mw = capacity_mw)
-    } else NULL
+    }
+  )
+  fleet_dated   <- fleet_points[!is.na(fleet_points$commissioning_year), ]
+  fleet_undated <- fleet_points[is.na(fleet_points$commissioning_year), ]
+  FLEET_MARKER_YEARS <- sort(unique(fleet_dated$commissioning_year))
 
-    all_pts <- bind_rows(ct, ren)
-
+  # Everything commissioned up to and including the selected year, plus the
+  # undated facilities as their own state. Counts only — the map no longer
+  # reads this; it shows and hides year groups instead (below).
+  fleet_visible <- reactive({
+    req(!is.null(fleet_timeline))
+    yr <- fleet_year()
     list(
       # Arrived: commissioned on or before the selected year.
-      arrived = all_pts |> filter(!is.na(commissioning_year),
-                                  commissioning_year <= yr),
+      arrived = fleet_dated[fleet_dated$commissioning_year <= yr, ],
       # Not yet: commissioned later. Drawn nowhere, but counted so the reader
       # can see the fleet is still growing beyond the cursor.
-      later   = all_pts |> filter(!is.na(commissioning_year),
-                                  commissioning_year > yr),
+      later   = fleet_dated[fleet_dated$commissioning_year > yr, ],
       # Undated: shown at every year in their own neutral state. §6 requires
       # them to be visibly excluded rather than assumed to have always existed,
       # and a marker that never changes is what "we do not know when" looks like.
-      undated = all_pts |> filter(is.na(commissioning_year))
+      undated = fleet_undated
     )
   })
 
@@ -1109,6 +1128,7 @@ function(input, output, session) {
                                      minZoom = 5, maxZoom = 12)) |>
       addTiles(urlTemplate = ESRI_BASE, attribution = ESRI_ATTRIB,
                options = tileOptions(minZoom = 5, maxZoom = 12)) |>
+      add_place_labels(maxZoom = 12) |>
       fitBounds(lng1 = MAP_BOUNDS$lng1, lat1 = MAP_BOUNDS$lat1,
                 lng2 = MAP_BOUNDS$lng2, lat2 = MAP_BOUNDS$lat2) |>
       setMaxBounds(lng1 = MAP_BOUNDS$lng1 - 1.5, lat1 = MAP_BOUNDS$lat1 - 1.0,
@@ -1131,17 +1151,27 @@ function(input, output, session) {
   # exist yet.
   outputOptions(output, "fleet_map", suspendWhenHidden = FALSE)
 
-  observe({
-    req(!is.null(fleet_timeline))
-    v <- fleet_visible()
+  # The markers are sent to the browser ONCE, the first time the fleet tab is
+  # opened, each in a layer group named after its commissioning year ("y2014").
+  # The slider then only shows and hides groups.
+  #
+  # The previous version cleared and resent every arrived marker on each slider
+  # step. Measured: about 600 KB per step for 3,136 renewable plants, sent to
+  # every visitor at page load whether or not they ever opened this tab, and
+  # roughly 15 MB across one play of the animation. A step now costs a list of
+  # group names, and a visitor who never opens the tab downloads none of it.
+  fleet_drawn <- reactiveVal(FALSE)
 
-    proxy <- leafletProxy("fleet_map") |>
-      clearGroup("arrived") |> clearGroup("undated")
+  observeEvent(input$tab, {
+    req(identical(input$tab, "fleet"), !fleet_drawn(), !is.null(fleet_timeline))
 
-    if (nrow(v$arrived) > 0) {
+    proxy <- leafletProxy("fleet_map")
+
+    if (nrow(fleet_dated) > 0) {
       proxy <- proxy |>
         addCircleMarkers(
-          data = v$arrived, lng = ~lon, lat = ~lat, group = "arrived",
+          data = fleet_dated, lng = ~lon, lat = ~lat,
+          group = ~paste0("y", commissioning_year),
           # Renewables carry a capacity, so their radius can scale; the modelled
           # facilities are drawn at a fixed size because their capacities are in
           # four incompatible units and any shared scale would be a fiction.
@@ -1156,18 +1186,14 @@ function(input, output, session) {
             "<b>Devreye giriş:</b> ", commissioning_year, "<br/>",
             "<b>Kapasite:</b> ",
             ifelse(is.na(mw), "bu görünümde ölçülmüyor",
-                   paste0(round(mw, 1), " MW")))
-        ) |>
-        clearGroup("labels") |>
-        addTiles(urlTemplate = ESRI_LABELS, group = "labels",
-                 options = tileOptions(minZoom = 5, maxZoom = 12,
-                                       opacity = 0.9))
+                   paste0(fmt_tr(mw, 1), " MW")))
+        )
     }
 
-    if (nrow(v$undated) > 0) {
+    if (nrow(fleet_undated) > 0) {
       proxy |>
         addCircleMarkers(
-          data = v$undated, lng = ~lon, lat = ~lat, group = "undated",
+          data = fleet_undated, lng = ~lon, lat = ~lat, group = "undated",
           # Hollow, neutral, and identical at every year. A third visual state
           # for a third epistemic state, exactly as projected years get their
           # own treatment on the emissions map.
@@ -1184,6 +1210,22 @@ function(input, output, session) {
             "bilinmediği için de bir yıla yazılmadı.</span>")
         )
     }
+
+    fleet_drawn(TRUE)
+  })
+
+  # The slider: a year group is visible when its year is on or before the
+  # cursor. Also runs once right after the first draw, because fleet_drawn()
+  # changes then — every group arrives visible and the later ones are hidden
+  # in the same flush, after the markers, so they never flash on screen.
+  observe({
+    req(fleet_drawn())
+    yr    <- fleet_year()
+    shown <- FLEET_MARKER_YEARS <= yr
+
+    proxy <- leafletProxy("fleet_map")
+    if (any(shown))  proxy <- proxy |> showGroup(paste0("y", FLEET_MARKER_YEARS[shown]))
+    if (any(!shown)) proxy |> hideGroup(paste0("y", FLEET_MARKER_YEARS[!shown]))
   })
 
 
@@ -1206,7 +1248,7 @@ function(input, output, session) {
     ren  <- tl_pick(d, "renewable", "cum_mw")
     pct  <- if (is.na(comb) || is.na(ren) || (comb + ren) == 0) NA
             else round(100 * ren / (comb + ren))
-    gw   <- function(mw) paste0(format(round(mw / 1000, 1), nsmall = 1), " GW")
+    gw   <- function(mw) if (is.na(mw)) "—" else paste0(fmt_tr(mw / 1000, 1), " GW")
     undated <- sum(unique(fleet_timeline[, c("group", "undated_n")])$undated_n)
 
     readout_strip(
@@ -1279,7 +1321,8 @@ function(input, output, session) {
     nmax <- max(tl[[n_col]], na.rm = TRUE)
     plot(NA, xlim = range(yrs), ylim = c(0, nmax * 1.08),
          axes = FALSE, xlab = "", ylab = "", bty = "n")
-    axis(4, col = PLOT_AXIS, col.axis = PLOT_SOFT)
+    axis(4, at = axTicks(4), labels = fmt_tr(axTicks(4)),   # 3.000, not 3000
+         col = PLOT_AXIS, col.axis = PLOT_SOFT)
     mtext(if (mode == "cum") "Kümülatif tesis sayısı" else "Yıllık eklenen tesis",
           side = 4, line = 2.9, cex = .8, col = PLOT_SOFT)
 
@@ -1441,6 +1484,13 @@ function(input, output, session) {
     req(!is.null(fleet_coverage))
     cv <- fleet_coverage[order(-fleet_coverage$share), ]
 
+    # The sentences quote the data rather than numbers typed in once and left
+    # to go stale at the next GEM release.
+    pct      <- function(x) round(100 * x)
+    spread   <- pct(max(cv$share)) - pct(min(cv$share))
+    comb_pct <- pct(cv$share[cv$group == "ct_combustion"])
+    ren_pct  <- pct(cv$share[cv$group == "renewable"])
+
     bar <- function(share, colour) {
       tags$div(
         style = "background:var(--panel); height:7px; border-radius:2px; width:100%;",
@@ -1453,7 +1503,7 @@ function(input, output, session) {
       tags$p(style = "font-size:13px; margin:0 0 12px;",
              "Bir tesis ancak devreye giriş yılı biliniyorsa bir yıla ",
              "atanabilir. Bu oranlar gruplar arasında ",
-             tags$b("34 puan"), " fark ediyor, ve bu fark eğrilerin ",
+             tags$b(spread, " puan"), " fark ediyor, ve bu fark eğrilerin ",
              "karşılaştırılabilirliğini doğrudan sınırlıyor."),
       lapply(seq_len(nrow(cv)), function(i) {
         g <- cv$group[i]
@@ -1470,9 +1520,13 @@ function(input, output, session) {
       tags$p(
         style = paste0("font-size:12px; color:var(--ink-2); margin-top:14px;",
                        " border-top:1px solid var(--line); padding-top:10px;"),
-        tags$b("Yanma %59, yenilenebilir %93. "),
-        "İki eğriyi ham hâlde karşılaştırmak, yanmayı olduğundan küçük ve ",
-        "geçişi olduğundan keskin gösterir. Kapsama oranı burada gösteriliyor ",
+        tags$b("Yanma %", comb_pct, ", yenilenebilir %", ren_pct, ". "),
+        # The direction of the bias is a claim about the data, so it is only
+        # made while the data still supports it.
+        if (length(comb_pct) == 1 && length(ren_pct) == 1 && comb_pct < ren_pct)
+          paste0("İki eğriyi ham hâlde karşılaştırmak, yanmayı olduğundan ",
+                 "küçük ve geçişi olduğundan keskin gösterir. "),
+        "Kapsama oranı burada gösteriliyor ",
         "ki okuyucu kendi indirimini yapabilsin — dipnot yerine bant, çünkü ",
         "dipnot okunmuyor."
       )
@@ -1562,25 +1616,73 @@ function(input, output, session) {
   # 7. SOURCES TAB
   # ===========================================================================
 
+  # CC BY 4.0 §3(1)(a) asks for more than a name: the creator, a URI to the
+  # material, a licence notice WITH a link, a statement that the material was
+  # MODIFIED, and the warranty disclaimer. Climate TRACE and Ember carried only
+  # the name until 2026-11-06; on a public page that is a licence breach, not a
+  # missing courtesy. Every source is now written through one constructor so
+  # none of the five parts can be left off again. The modification lists mirror
+  # data/processed/SOURCES_*.md.
+  cc_by_link <- tags$a(href = "https://creativecommons.org/licenses/by/4.0/deed.tr",
+                       target = "_blank", rel = "noopener", "CC BY 4.0")
+
+  attribution <- function(title, creator, url, changes, extra = NULL) {
+    tagList(
+      tags$h4(title),
+      tags$p(creator, " — ",
+             tags$a(href = url, target = "_blank", rel = "noopener", url),
+             ". Lisans: ", cc_by_link, ".", extra),
+      tags$p(style = "font-size:12px; color:var(--ink-2);",
+             tags$b("Değiştirilmiştir: "), changes)
+    )
+  }
+
   output$sources_panel <- renderUI({
     tagList(
-      tags$h4("Climate TRACE — tesis düzeyinde emisyon tahminleri"),
-      tags$p("Climate TRACE (climatetrace.org), ", tags$b("CC BY 4.0"),
-             " lisansı altında. Sürüm: ", tags$code(SOURCE_RELEASE), "."),
+      attribution(
+        "Climate TRACE — tesis düzeyinde emisyon tahminleri",
+        "Climate TRACE", "https://climatetrace.org",
+        paste0("Türkiye kayıtlarına filtrelendi; aylık değerler yıllığa ",
+               "toplandı; sütunlar bu projenin şemasına göre yeniden adlandırıldı; ",
+               "Global Energy Monitor kayıtlarıyla birleştirildi; il ve İBBS-2 ",
+               "bölgesi koordinatlardan türetildi."),
+        extra = tagList(" Sürüm: ", tags$code(SOURCE_RELEASE), ".")
+      ),
 
-      tags$h4("Global Energy Monitor — devreye giriş yılları ve filo"),
-      tags$p("Global Energy Monitor, ", tags$b("CC BY 4.0"),
-             ". Global Integrated Power Tracker ve Global Coal Mine Tracker. ",
-             "Veriler Türkiye'ye filtrelenmiş, Climate TRACE kayıtlarıyla ",
-             "koordinat yakınlığıyla eşleştirilmiş ve koordinatlardan il ile ",
-             "İBBS-2 bölgesi türetilmiştir."),
+      attribution(
+        "Global Energy Monitor — devreye giriş yılları ve filo",
+        "Global Energy Monitor (Global Integrated Power Tracker, Global Coal Mine Tracker)",
+        "https://globalenergymonitor.org",
+        paste0("Türkiye kayıtlarına filtrelendi; sütunlar yeniden adlandırıldı ",
+               "ve bir kısmı alındı; Climate TRACE kayıtlarıyla ad ve koordinat ",
+               "yakınlığıyla eşleştirildi; il ve İBBS-2 bölgesi koordinatlardan ",
+               "türetildi.")
+      ),
 
-      tags$h4("Ember — ulusal üretim ve şebeke yoğunluğu"),
-      tags$p("Ember (Ember Energy Research CIC), ", tags$b("CC BY 4.0"),
-             ". Yakıt bazlı yıllık üretim serisi, 2000'den itibaren."),
+      attribution(
+        "Ember — ulusal üretim ve şebeke yoğunluğu",
+        "Ember (Ember Energy Research CIC)",
+        "https://ember-energy.org/data/yearly-electricity-data/",
+        paste0("Türkiye'ye ve 2000 sonrasına filtrelendi; yakıt bazlı üretim ve ",
+               "enerji sektörü CO₂ yoğunluğu serileriyle sınırlandı; toplamlar ",
+               "yakıt satırlarından yeniden hesaplandı; Climate TRACE değerleriyle ",
+               "karşılaştırmak için birleştirildi.")
+      ),
 
       tags$h4("Natural Earth — idari sınırlar"),
-      tags$p("Made with Natural Earth, ", tags$b("kamu malı"), "."),
+      tags$p("Made with Natural Earth — ",
+             tags$a(href = "https://www.naturalearthdata.com", target = "_blank",
+                    rel = "noopener", "https://www.naturalearthdata.com"),
+             ". ", tags$b("Kamu malı"), "."),
+
+      # §5 warranty disclaimer and §2(5)(c) no-endorsement, stated once for all
+      # three CC BY sources.
+      tags$p(style = "font-size:12px; color:var(--ink-2);",
+             tags$b("Garanti reddi ve onay yokluğu: "),
+             "Kaynak veriler lisanslarının 5. maddesi uyarınca \"olduğu gibi\" ",
+             "ve hiçbir garanti olmaksızın sunulur. Climate TRACE, Global Energy ",
+             "Monitor ve Ember bu projeyi onaylamamaktadır; böyle bir onay ",
+             "ima edilmemelidir."),
 
       tags$h4("Esri — altlık harita"),
       tags$p("Dark Gray Canvas. ", HTML(ESRI_ATTRIB), "."),

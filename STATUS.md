@@ -4,7 +4,20 @@
 this file says where it *got to*, what runs, what is blocked, and which traps have already
 been paid for.
 
-Last updated: **2026-09-07** · 49 commits · **~78% complete** · 322 assertions passing
+Last updated: **2026-11-06** · **~78% complete** · 336 assertions passing
+
+> **2026-11-06 — app hardened for public embedding** (recepresearch.org, "araçlar").
+> The interface will be re-skinned by the author to the site's identity, so this pass
+> touched behaviour only, not look. Fixed: filters shown on the fleet tab that did
+> nothing there; the fleet map resending ~600 KB of markers on every slider step and to
+> every visitor at load (now sent once, on first opening, as per-year groups); numbers in
+> English marks ("74.9 Mt" → "74,9 Mt"); Climate TRACE and Ember attribution missing the
+> CC BY §3(1)(a) modification statement and links; place-name tiles re-added on every
+> redraw; the TR-ETS threshold hard-coded in app and pipeline instead of read from
+> `tr_ets.json`; a route option with zero facilities; coverage sentences with typed-in
+> numbers. `tests/testthat/test-app-server.R` drives the real server through
+> `shiny::testServer`. Verified in headless Chrome: real click selects a facility,
+> no console errors. **Still open: deployment bundle** — see §6, "Deployment".
 
 > The figure moved 53% → 35% → 58% → 69% → 72% → 76% → 75%. Both falls are denominator
 > corrections, not lost work: the 2026-08-19 scope merge, and then finding on 2026-09-01
@@ -257,6 +270,15 @@ Full reasoning in `ROADMAP.md`. Compressed here so a resuming session does not r
 Numbered as in `ROADMAP.md`. The author-facing task list is published at
 <https://claude.ai/code/artifact/3934ba71-177d-484b-800e-01f4ee3786aa> (B1–B10).
 
+**Deployment (open, 2026-11-06)** — the app reads `data/processed/` and `policies/`
+from the project root, found by the `KARBON_ATLASI.md` marker. shinyapps.io and
+shinylive both bundle only the app directory, so `app/` published on its own fails at
+start-up with "Could not locate the project root". Needs a bundling step that puts the
+data beside the app; its shape depends on the hosting choice, which is **undecided**.
+Related gap: `SOURCES.md` (written by `01_fetch_climate_trace.R`) carries no
+"Modifications" section for Climate TRACE, unlike `SOURCES_GEM.md` and
+`SOURCES_EMBER.md`; the app's sources tab now states it, the generated file does not.
+
 **Blocking the pipeline** — nothing downstream can be built until these land:
 
 - **B1** Direct/indirect decomposition, *per sector*. The `other1`–`other10` slots carry
@@ -416,6 +438,18 @@ Every one of these cost real time. Do not rediscover them.
   `01b_fetch_eu_trade.R`. Re-snapshot after refactors and check the pipeline still runs.
 - **`runApp()` changes the working directory to the app folder**, so root-relative data
   paths resolve to `app/data/…`. `global.R` locates the project root by marker file.
+- **Starting the app in a test leaks `options(encoding = "UTF-8")`** from `global.R`
+  into every later test file, and `jsonvalidate` then misreads its own `bundle.js`
+  ("invalid input found on input connection") — the failure appears in
+  `test-validate-gates.R`, nowhere near its cause. `test-app-server.R` restores the
+  option per test; any new test that starts the app must do the same.
+- **Tile layers in a custom Leaflet pane swallow clicks.** Leaflet makes no tile image
+  click-through, so the place-label pane above the markers needs
+  `pointer-events: none` (set in `ui.R`, deliberately not in `atlas.css`, so a restyle
+  cannot remove it). Without it no facility can be selected — and nothing errors.
+- **`leafletProxy` + `clearGroup` + re-add is a payload trap.** Redrawing 3,136 markers
+  per slider step cost ~600 KB each time. Add once into per-year groups and
+  `showGroup()`/`hideGroup()`.
 - **`pivot_longer(names_to = c("slot", ".value"))` cannot produce an empty column name.**
   For `other1` / `other1_def` pairs, rename the unsuffixed half first.
 

@@ -602,8 +602,34 @@ ROUTE_NOTES <- c(
     "çeliktekinden çok daha az belirleyicidir.")
 )
 
-# TR-ETS threshold, read from the policy file rather than repeated here.
-TR_ETS_THRESHOLD_T <- 50000
+# The route filter's choices, built from the data with counts, the same way the
+# sector list is. A hand-written list offered "BF-BOF" although no facility in
+# the register carries that route, and choosing it emptied the map with no
+# explanation. Only routes that occur are offered.
+ROUTES_PRESENT <- names(ROUTE_LABELS)[names(ROUTE_LABELS) %in%
+                                        facilities$process_route]
+ROUTE_CHOICES <- c(
+  "Tümü" = "all",
+  setNames(ROUTES_PRESENT,
+           paste0(ROUTE_LABELS[ROUTES_PRESENT], " (",
+                  vapply(ROUTES_PRESENT, function(r)
+                    sum(facilities$process_route == r, na.rm = TRUE),
+                    integer(1)), ")")),
+  setNames("none", paste0("Rotası bilinmeyen (",
+                          sum(is.na(facilities$process_route)), ")"))
+)
+
+# TR-ETS threshold, read from the policy file at runtime (§7): when the
+# regulation changes, the fix is an edit to policies/tr_ets.json, never to R.
+# Stops rather than falling back to a remembered number, because a silently
+# stale threshold would misclassify facilities without any visible sign.
+TR_ETS_THRESHOLD_T <- jsonlite::fromJSON(
+  file.path(PROJECT_ROOT, "policies", "tr_ets.json")
+)$scope$threshold_tco2e_per_year
+if (!is.numeric(TR_ETS_THRESHOLD_T) || length(TR_ETS_THRESHOLD_T) != 1) {
+  stop("policies/tr_ets.json: scope$threshold_tco2e_per_year is missing or ",
+       "not a single number.", call. = FALSE)
+}
 
 
 FLEET_LABELS <- c(

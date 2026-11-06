@@ -97,10 +97,13 @@ dashboardPage(
     ),
 
     # --- FILTERS --------------------------------------------------------------
-    # Only the two tabs that read them. The grid and sources tabs consume no
-    # filter, and rendering fourteen inert controls beside them said otherwise.
+    # Map tab only, because it is the only tab that reads them. They used to be
+    # shown on the fleet tab as well, where unticking a population changed
+    # nothing: the fleet chart is a national series built by the pipeline and
+    # cannot be filtered honestly, so the controls were inert there while
+    # looking live. A filter that silently does nothing is worse than none.
     conditionalPanel(
-      condition = "input.tab == 'map' || input.tab == 'fleet'",
+      condition = "input.tab == 'map'",
       tags$hr(),
       tags$div(
         style = "padding: 0 18px;",
@@ -147,9 +150,9 @@ dashboardPage(
         selectInput(
           inputId  = "route_filter",
           label    = "Proses rotası",
-          choices  = c("Tümü" = "all",
-                       setNames(names(ROUTE_LABELS), unname(ROUTE_LABELS)),
-                       "Rotası bilinmeyen" = "none"),
+          # Built from the data in global.R, with counts, so no option can
+          # lead to an empty map.
+          choices  = ROUTE_CHOICES,
           selected = "all"
         ),
 
@@ -221,7 +224,14 @@ dashboardPage(
         )
       ),
 
-      tags$link(rel = "stylesheet", type = "text/css", href = "atlas.css")
+      tags$link(rel = "stylesheet", type = "text/css", href = "atlas.css"),
+
+      # FUNCTIONAL, NOT THEME — keep this when the stylesheet is replaced.
+      # Place-name tiles sit in their own map pane above the facility markers
+      # (server.R, renderLeaflet). Leaflet does not make tile images in a custom
+      # pane click-through, so without this rule the label layer swallows every
+      # click and no facility can be selected.
+      tags$style(HTML(".leaflet-place_labels-pane { pointer-events: none; }"))
     ),
 
     tabItems(

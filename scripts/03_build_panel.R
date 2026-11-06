@@ -500,7 +500,13 @@ saveRDS(panel, file.path(DIR_PROCESSED, "facility_panel.rds"))
 
 message("[7/7] Checking TR-ETS threshold coverage")
 
-ETS_THRESHOLD_T <- 50000
+# Read from the policy file (§7), the same source the app reads, so the
+# classification written here and the threshold the app displays beside it can
+# never disagree after a regulatory change.
+ETS_THRESHOLD_T <- jsonlite::fromJSON(
+  file.path("policies", "tr_ets.json")
+)$scope$threshold_tco2e_per_year
+stopifnot(is.numeric(ETS_THRESHOLD_T), length(ETS_THRESHOLD_T) == 1)
 
 ets_year <- max(panel$year[panel$value_type == "observed"])
 
