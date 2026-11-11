@@ -4,7 +4,21 @@
 this file says where it *got to*, what runs, what is blocked, and which traps have already
 been paid for.
 
-Last updated: **2026-11-06** · **~78% complete** · 336 assertions passing
+Last updated: **2026-11-11** · **~78% complete** · 366 assertions passing
+
+> **2026-11-11 — deployable, and ready to be embedded.** Project-side work only; the
+> host site is a separate job. `scripts/06_bundle_app.R` writes `app/bundle/`, so `app/`
+> can be published on its own (tested by starting it outside the repository). A small
+> host contract (`app/www/embed.js`, `server.R` §8): query-string deep links, iframe
+> height, view state, validated commands. A CSV download carrying the licence notice.
+> Map fixes: phone opening view, smaller map and legend on phones, largest markers
+> drawn first. A focused security review led to escaped popup HTML, CSV formula
+> neutralisation, a delete guard in the bundle script, and sanitised errors when
+> deployed. The Climate TRACE modification section was added to `SOURCES.md`, and plot
+> labels changed from "CO□" to CO₂. All of it was verified in headless Chrome against a
+> throwaway host page; README "Deployment" and "Embedding" document it. **Open:** basemap
+> sharpness on high-DPI screens (author to choose a tile option); keeping the data
+> current (to discuss).
 
 > **2026-11-06 — app hardened for public embedding** (recepresearch.org, "araçlar").
 > The interface will be re-skinned by the author to the site's identity, so this pass
@@ -17,7 +31,7 @@ Last updated: **2026-11-06** · **~78% complete** · 336 assertions passing
 > `tr_ets.json`; a route option with zero facilities; coverage sentences with typed-in
 > numbers. `tests/testthat/test-app-server.R` drives the real server through
 > `shiny::testServer`. Verified in headless Chrome: real click selects a facility,
-> no console errors. **Still open: deployment bundle** — see §6, "Deployment".
+> no console errors. Deployment bundle closed 2026-11-11 (above).
 
 > The figure moved 53% → 35% → 58% → 69% → 72% → 76% → 75%. Both falls are denominator
 > corrections, not lost work: the 2026-08-19 scope merge, and then finding on 2026-09-01
@@ -30,7 +44,7 @@ Last updated: **2026-11-06** · **~78% complete** · 336 assertions passing
 > emissions panel. The fleet tab runs 2000–2026 over `commissioning_year`. Each has its own
 > slider, because a shared one would leave twenty years of empty map.
 
-**Published:** <https://github.com/ContinentOfGrinch/TR-Energy-Policy-Tracker>
+**Published:** <https://github.com/ilhanselahattin/TR-Energy-Policy-Tracker>
 (rename to `karbon-atlasi-turkiye` still outstanding)
 
 > Keep this file current. When a milestone lands or a decision changes, update the
@@ -168,6 +182,7 @@ Rscript scripts/02_build_facilities.R     # -> facilities.rds + fleet_renewables
 Rscript scripts/03_build_panel.R          # -> facility_panel.rds (1,800 rows)
 Rscript scripts/04_build_fleet_timeline.R # -> fleet_timeline.csv (2000-2026)
 Rscript scripts/05_build_ownership.R      # -> ownership.rds, who owns the carbon
+Rscript scripts/06_bundle_app.R           # -> app/bundle/, before any deployment
 
 # tests — run these SEPARATELY from any commit
 Rscript tests/testthat.R
@@ -270,14 +285,18 @@ Full reasoning in `ROADMAP.md`. Compressed here so a resuming session does not r
 Numbered as in `ROADMAP.md`. The author-facing task list is published at
 <https://claude.ai/code/artifact/3934ba71-177d-484b-800e-01f4ee3786aa> (B1–B10).
 
-**Deployment (open, 2026-11-06)** — the app reads `data/processed/` and `policies/`
-from the project root, found by the `KARBON_ATLASI.md` marker. shinyapps.io and
-shinylive both bundle only the app directory, so `app/` published on its own fails at
-start-up with "Could not locate the project root". Needs a bundling step that puts the
-data beside the app; its shape depends on the hosting choice, which is **undecided**.
-Related gap: `SOURCES.md` (written by `01_fetch_climate_trace.R`) carries no
-"Modifications" section for Climate TRACE, unlike `SOURCES_GEM.md` and
-`SOURCES_EMBER.md`; the app's sources tab now states it, the generated file does not.
+**Deployment — closed 2026-11-11.** `scripts/06_bundle_app.R` copies data, policies and
+attribution into `app/bundle/`; `global.R` reads it when no project root exists. See
+README "Deployment". `SOURCES.md` now carries the Climate TRACE modifications section.
+
+**Basemap sharpness (open, author's choice).** Esri Canvas tiles are 256 px JPEG with no
+@2x variant, so the base map and place names are soft on high-DPI screens and phones;
+markers are already sharp. Options and trade-offs were set out to the author on
+2026-11-06 (A: @2x raster provider, B: vector basemap via maplibre-gl-leaflet,
+C: full move to `mapgl`).
+
+**Keeping data current (open, to discuss).** Climate TRACE, GEM and Ember release on
+their own schedules; no refresh routine exists yet.
 
 **Blocking the pipeline** — nothing downstream can be built until these land:
 

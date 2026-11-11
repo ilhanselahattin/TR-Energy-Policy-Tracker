@@ -24,6 +24,20 @@ test_that("Climate TRACE attribution travels with the processed data", {
 })
 
 
+test_that("every CC BY notice states that the material was modified", {
+  # CC BY 4.0 §3(1)(a)(ii). Naming the source is not enough. The Climate TRACE
+  # notice — the primary source — lacked this section until 2026-11-11 while
+  # GEM's and Ember's had it, so the check covers all three.
+  for (f in c("SOURCES.md", "SOURCES_GEM.md", "SOURCES_EMBER.md")) {
+    path <- file.path(PROCESSED, f)
+    if (!file.exists(path)) next
+    txt <- paste(readLines(path, warn = FALSE, encoding = "UTF-8"), collapse = "\n")
+    expect_match(txt, "Modifications", fixed = TRUE, info = f)
+    expect_match(txt, "without warranties", fixed = TRUE, info = f)
+  }
+})
+
+
 test_that("GEM attribution exists whenever GEM data has been ingested", {
   gem_data <- file.path(PROCESSED, "gem_commissioning.csv")
   skip_if_not(file.exists(gem_data), "GEM not ingested yet")

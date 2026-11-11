@@ -146,3 +146,82 @@ test_that("the TR-ETS threshold comes from the policy file, in app and pipeline"
   expect_true(all(cov$threshold_t == json_t))
   expect_equal(cov$above_threshold, cov$emissions_t >= json_t)
 })
+
+
+# --- embedding contract (server.R section 8, app/www/embed.js) ----------------
+
+test_that("host commands select a facility, and junk is ignored", {
+  skip_if_app_unbuilt()
+
+  shiny::testServer(APP_DIR, {
+    default_inputs(session)
+    fid <- facilities$facility_id[facilities$asset_class == "industrial"][1]
+
+    session$setInputs(embed_command = list(facility = fid))
+    expect_identical(selected_id(), fid)
+
+    # Unknown tab, out-of-range year, invented facility: nothing changes and
+    # nothing errors — a stale link must leave a working atlas.
+    session$setInputs(embed_command = list(tab = "<script>", year = "1899",
+                                           facility = "NOT-AN-ID"))
+    expect_identical(selected_id(), fid)
+  })
+})
+
+
+test_that("a host command for a filtered-out facility opens the filters", {
+  skip_if_app_unbuilt()
+
+  shiny::testServer(APP_DIR, {
+    # Only industrial shown; ask for an energy asset.
+    default_inputs(session, asset_classes = "industrial")
+    fid <- facilities$facility_id[facilities$asset_class == "energy"][1]
+    expect_false(fid %in% selected_facilities()$facility_id)
+
+    session$setInputs(embed_command = list(facility = fid))
+    expect_identical(selected_id(), fid)
+  })
+})
+
+
+# --- download (server.R section 9) ---------------------------------------------
+
+test_that("the CSV download carries the notice, the rows and intact Turkish", {
+  skip_if_app_unbuilt()
+  skip_if_not(file.exists(file.path(PROCESSED, "facility_panel.rds")),
+              "facility_panel.rds not built")
+
+  shiny::testServer(APP_DIR, {
+    default_inputs(session, year = DEFAULT_YEAR)
+    session$elapse(300)
+    path <- output$download_csv
+
+    raw <- readBin(path, "raw", 3)
+    expect_identical(raw, as.raw(c(0xEF, 0xBB, 0xBF)))       # BOM for Excel
+
+    lines <- readLines(path, encoding = "UTF-8", warn = FALSE)
+    expect_true(any(grepl("CC BY 4.0", lines)))
+    expect_true(any(grepl("Değiştirilmiştir", lines)))       # §3(1)(a)(ii)
+
+    d <- utils::read.csv(path, comment.char = "#", encoding = "UTF-8",
+                         fileEncoding = "UTF-8-BOM")
+    expect_equal(nrow(d), nrow(selected_facilities()))
+    expect_true(all(c("facility_id", "emissions_t", "gas_basis", "value_type")
+                    %in% names(d)))
+    # Turkish survives the round trip (a province name with a dotless i or ş).
+    expect_true(any(grepl("[ıİşŞğĞ]", d$province)))
+  })
+})
+
+
+test_that("upstream names are escaped before they enter popup markup", {
+  skip_if_app_unbuilt()
+
+  shiny::testServer(APP_DIR, {
+    # esc() is what server.R wraps every data field in popup HTML with.
+    expect_identical(as.character(esc("<img src=x onerror=alert(1)>")),
+                     "&lt;img src=x onerror=alert(1)&gt;")
+    expect_identical(as.character(esc("Billet & Slab")), "Billet &amp; Slab")
+    expect_identical(as.character(esc("Çerkezköy İşletmesi")), "Çerkezköy İşletmesi")
+  })
+})

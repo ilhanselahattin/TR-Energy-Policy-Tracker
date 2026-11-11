@@ -228,37 +228,39 @@ function(input, output, session) {
     map |>
       addMapPane("place_labels", zIndex = 450) |>
       addTiles(urlTemplate = ESRI_LABELS,
-               options = tileOptions(pane = "place_labels", minZoom = 5,
+               options = tileOptions(pane = "place_labels", minZoom = MAP_MIN_ZOOM,
                                      maxZoom = maxZoom, opacity = 0.9))
   }
-  # Rendered ONCE with a fixed view; markers are updated through leafletProxy
-  # (§4). Re-rendering the whole map on every filter change would reset the
-  # user's pan and zoom, which is both slow and infuriating.
 
-  output$map <- renderLeaflet({
+  # Shared by both maps so they cannot drift apart: the same bounds, the same
+  # zoom floor, the same fractional steps (see MAP_MIN_ZOOM in global.R).
+  atlas_map <- function(maxZoom) {
     leaflet(options = leafletOptions(
       preferCanvas = TRUE,
-      # The atlas is about Türkiye. Letting the view drift into the Atlantic
-      # makes it look unfinished and invites the reader to look for data that
-      # was never claimed. maxBounds pins panning; minZoom stops the country
-      # shrinking to a dot. A world view belongs to a future trade layer with
-      # its own map, not to this one.
-      minZoom = 5, maxZoom = 14
+      minZoom = MAP_MIN_ZOOM, maxZoom = maxZoom,
+      zoomSnap = MAP_ZOOM_SNAP, zoomDelta = 0.5
     )) |>
-      # Dark ground, so the basemap recedes almost completely and the facility
-      # points are the only saturated thing on screen. Base and labels are two
-      # layers: the labels are added AFTER the markers in the observer below, so
-      # a city name is never buried under a dot. See ESRI_BASE in global.R for
-      # why this is not CartoDB.
       addTiles(urlTemplate = ESRI_BASE, attribution = ESRI_ATTRIB,
-               options = tileOptions(minZoom = 5, maxZoom = 14)) |>
-      add_place_labels(maxZoom = 14) |>
+               options = tileOptions(minZoom = MAP_MIN_ZOOM, maxZoom = maxZoom)) |>
+      add_place_labels(maxZoom = maxZoom) |>
       fitBounds(lng1 = MAP_BOUNDS$lng1, lat1 = MAP_BOUNDS$lat1,
                 lng2 = MAP_BOUNDS$lng2, lat2 = MAP_BOUNDS$lat2) |>
       # A little slack beyond the data so coastal facilities are not pinned to
       # the very edge of the viewport.
       setMaxBounds(lng1 = MAP_BOUNDS$lng1 - 1.5, lat1 = MAP_BOUNDS$lat1 - 1.0,
-                   lng2 = MAP_BOUNDS$lng2 + 1.5, lat2 = MAP_BOUNDS$lat2 + 1.0) |>
+                   lng2 = MAP_BOUNDS$lng2 + 1.5, lat2 = MAP_BOUNDS$lat2 + 1.0)
+  }
+  # Rendered ONCE with a fixed view; markers are updated through leafletProxy
+  # (§4). Re-rendering the whole map on every filter change would reset the
+  # user's pan and zoom, which is both slow and infuriating.
+
+  # The atlas is about Türkiye. maxBounds pins panning so the view cannot drift
+  # into the Atlantic; the zoom floor stops the country shrinking to a dot. A
+  # world view belongs to a future trade layer with its own map. Base and place
+  # names are separate layers, names above the markers (add_place_labels). See
+  # ESRI_BASE in global.R for why this is not CartoDB.
+  output$map <- renderLeaflet({
+    atlas_map(maxZoom = 14) |>
       addLegend(
         position = "bottomright",
         colors   = unname(SECTOR_COLOURS),
@@ -315,6 +317,15 @@ function(input, output, session) {
 
     radius <- scaled_radius(df$emissions_reported_t, df$asset_class)
 
+    # Largest first, so the canvas paints small facilities ON TOP of large ones.
+    # In arbitrary order a 4px plant beside a 15px one in the Marmara or
+    # Ereğli clusters could be painted over entirely and become unclickable.
+    o <- order(radius, decreasing = TRUE)
+    df <- df[o, ]
+    radius <- radius[o]
+    if (length(stroke_colour) > 1) stroke_colour <- stroke_colour[o]
+    if (length(stroke_weight) > 1) stroke_weight <- stroke_weight[o]
+
     # A projection is drawn dashed and desaturated. Never identical to an
     # observation (§5) — colour alone is not enough, so the outline changes too.
     dash <- if (projected) "3,4" else NULL
@@ -322,6 +333,10 @@ function(input, output, session) {
 
     proxy |>
       addCircleMarkers(
+        # The re-ordered rows, explicitly: the proxy was created with df in its
+        # original order, and formulas would otherwise resolve against that —
+        # pairing each radius with a different facility.
+        data         = df,
         lng          = ~lon,
         lat          = ~lat,
         layerId      = ~facility_id,
@@ -337,7 +352,7 @@ function(input, output, session) {
                                       paste0(fmt_tr(emissions_reported_t / 1000, 1),
                                              " kt"))),
         popup        = ~paste0(
-          "<strong>", facility_name_tr, "</strong><br/>",
+          "<strong>", esc(facility_name_tr), "</strong><br/>",
           "<em>", unname(SECTOR_LABELS[sector]), " · ",
           unname(ASSET_CLASS_LABELS[asset_class]), "</em><br/><br/>",
 
@@ -363,11 +378,11 @@ function(input, output, session) {
           ifelse(is.na(confidence_emissions), "—", confidence_emissions),
           "<br/><br/>",
 
-          "<b>İşletmeci:</b> ", ifelse(is.na(operator_name), "—", operator_name), "<br/>",
-          "<b>Teknoloji:</b> ", ifelse(is.na(technology), "—", technology), "<br/>",
+          "<b>İşletmeci:</b> ", ifelse(is.na(operator_name), "—", esc(operator_name)), "<br/>",
+          "<b>Teknoloji:</b> ", ifelse(is.na(technology), "—", esc(technology)), "<br/>",
           "<b>Devreye giriş:</b> ",
           ifelse(is.na(commissioning_year), "bilinmiyor", commissioning_year), "<br/>",
-          "<b>İl:</b> ", province_name_tr, " (", province_code, ")<br/>",
+          "<b>İl:</b> ", esc(province_name_tr), " (", province_code, ")<br/>",
           "<b>Yükümlülük:</b> ", unname(LIABILITY_SHORT[liability_class])
         )
       )
@@ -411,14 +426,14 @@ function(input, output, session) {
         weight      = 0.5,
         label       = ~plant_name,
         popup       = ~paste0(
-          "<strong>", plant_name, "</strong><br/>",
+          "<strong>", esc(plant_name), "</strong><br/>",
           "<em>", unname(FLEET_LABELS[fuel_type]), " — yenilenebilir filo</em>",
           "<br/><br/>",
           "<b>Kapasite:</b> ", fmt_tr(capacity_mw, 1), " MW",
           ifelse(units > 1, paste0(" (", units, " ünite)"), ""), "<br/>",
           "<b>Devreye giriş:</b> ",
           ifelse(is.na(commissioning_year), "bilinmiyor", commissioning_year), "<br/>",
-          "<b>İl:</b> ", province_name_tr, "<br/>",
+          "<b>İl:</b> ", esc(province_name_tr), "<br/>",
           "<b>Kaynak:</b> Global Energy Monitor<br/><br/>",
           "<span style='color:var(--ink-2);'>Bu tesis modellenen 300 kaydın parçası ",
           "değildir. Emisyon üretmediği için emisyon tablolarında yer almaz; ",
@@ -492,7 +507,7 @@ function(input, output, session) {
       tk <- axTicks(side)
       axis(side, at = tk, labels = fmt_tr(tk, if (all(tk == round(tk))) 0 else 2),
            col = colour, col.axis = colour)
-      mtext(unname(GAS_LABELS[basis]), side = side, line = 2.4,
+      mtext(as.expression(PLOT_GAS_LABELS[[basis]]), side = side, line = 2.4,
             col = colour, cex = 0.8)
 
       # Observed and projected are drawn as two segments of one line: solid up
@@ -545,7 +560,7 @@ function(input, output, session) {
       fold_note(
         tagList(tags$b("İki ayrı eksen, iki ayrı gaz."),
                 " Eğriler aynı ölçekte değildir ve toplanmaz."),
-        "Sol eksen sanayi CO₂, sağ eksen enerji CO₂e. ",
+        "Sol eksen sanayi CO₂, sağ eksen enerji CO₂e (100 yıllık ısınma potansiyeli). ",
         "Dolu nokta ve düz çizgi gözlem, içi boş nokta ve kesik çizgi ",
         "kestirimdir. Nokta üstündeki etiket, o yılın kaç aylık veriyle ",
         "hesaplandığını gösterir. Dikey noktalı çizgi slider'ın bulunduğu yıldır."
@@ -1078,7 +1093,14 @@ function(input, output, session) {
                   tl_group = "renewable",
                   mw = capacity_mw)
     }
-  )
+  ) |>
+    # Renewables carry a capacity, so their radius can scale; the modelled
+    # facilities are drawn at a fixed size because their capacities are in
+    # four incompatible units and any shared scale would be a fiction.
+    mutate(r = if_else(is.na(mw), 5,
+                       pmax(2.5, pmin(10, sqrt(pmax(mw, 0)) / 2.6)))) |>
+    # Largest first, so small plants are painted on top and stay clickable.
+    arrange(desc(r))
   fleet_dated   <- fleet_points[!is.na(fleet_points$commissioning_year), ]
   fleet_undated <- fleet_points[is.na(fleet_points$commissioning_year), ]
   FLEET_MARKER_YEARS <- sort(unique(fleet_dated$commissioning_year))
@@ -1124,15 +1146,7 @@ function(input, output, session) {
   })
 
   output$fleet_map <- renderLeaflet({
-    leaflet(options = leafletOptions(preferCanvas = TRUE,
-                                     minZoom = 5, maxZoom = 12)) |>
-      addTiles(urlTemplate = ESRI_BASE, attribution = ESRI_ATTRIB,
-               options = tileOptions(minZoom = 5, maxZoom = 12)) |>
-      add_place_labels(maxZoom = 12) |>
-      fitBounds(lng1 = MAP_BOUNDS$lng1, lat1 = MAP_BOUNDS$lat1,
-                lng2 = MAP_BOUNDS$lng2, lat2 = MAP_BOUNDS$lat2) |>
-      setMaxBounds(lng1 = MAP_BOUNDS$lng1 - 1.5, lat1 = MAP_BOUNDS$lat1 - 1.0,
-                   lng2 = MAP_BOUNDS$lng2 + 1.5, lat2 = MAP_BOUNDS$lat2 + 1.0) |>
+    atlas_map(maxZoom = 12) |>
       addLegend(position = "bottomright",
                 colors = c(unname(TL_COLOURS), "#5A6670"),
                 labels = c(unname(TL_LABELS), "Tarihi bilinmiyor"),
@@ -1165,24 +1179,25 @@ function(input, output, session) {
   observeEvent(input$tab, {
     req(identical(input$tab, "fleet"), !fleet_drawn(), !is.null(fleet_timeline))
 
-    proxy <- leafletProxy("fleet_map")
+    # The map was built while its tab was hidden, in a container with no size,
+    # so its initial fit was computed against nothing. Fit again now that it
+    # is visible.
+    proxy <- leafletProxy("fleet_map") |>
+      fitBounds(lng1 = MAP_BOUNDS$lng1, lat1 = MAP_BOUNDS$lat1,
+                lng2 = MAP_BOUNDS$lng2, lat2 = MAP_BOUNDS$lat2)
 
     if (nrow(fleet_dated) > 0) {
       proxy <- proxy |>
         addCircleMarkers(
           data = fleet_dated, lng = ~lon, lat = ~lat,
           group = ~paste0("y", commissioning_year),
-          # Renewables carry a capacity, so their radius can scale; the modelled
-          # facilities are drawn at a fixed size because their capacities are in
-          # four incompatible units and any shared scale would be a fiction.
-          radius = ~if_else(is.na(mw), 5,
-                            pmax(2.5, pmin(10, sqrt(pmax(mw, 0)) / 2.6))),
+          radius = ~r,   # computed with fleet_points, see there
           fillColor = ~unname(TL_COLOURS[tl_group]),
           fillOpacity = 0.8, color = "#11161A", weight = 0.6,
           label = ~paste0(name, " · ", commissioning_year),
           popup = ~paste0(
-            "<strong>", name, "</strong><br/>",
-            "<em>", detail, "</em><br/><br/>",
+            "<strong>", esc(name), "</strong><br/>",
+            "<em>", esc(detail), "</em><br/><br/>",
             "<b>Devreye giriş:</b> ", commissioning_year, "<br/>",
             "<b>Kapasite:</b> ",
             ifelse(is.na(mw), "bu görünümde ölçülmüyor",
@@ -1201,8 +1216,8 @@ function(input, output, session) {
           color = "#7C8A94", weight = 1.6, opacity = 0.9,
           label = ~paste0(name, " — devreye giriş yılı bilinmiyor"),
           popup = ~paste0(
-            "<strong>", name, "</strong><br/>",
-            "<em>", detail, "</em><br/><br/>",
+            "<strong>", esc(name), "</strong><br/>",
+            "<em>", esc(detail), "</em><br/><br/>",
             "<b>Devreye giriş yılı bilinmiyor.</b><br/>",
             "<span style='color:#93A1AB;'>Bu tesis hiçbir yıla atanmadı. ",
             "Zaman çizelgesinin dışındadır ve her yılda aynı şekilde ",
@@ -1741,4 +1756,189 @@ function(input, output, session) {
              tags$code("SOURCES_EMBER.md"))
     )
   })
+
+
+  # ===========================================================================
+  # 8. EMBEDDING — the contract with the host page
+  # ===========================================================================
+  # The atlas sits in an iframe on recepresearch.org and the site supplies its
+  # own interface around it. Two inbound routes set the view, and both go
+  # through apply_view(), so they cannot disagree about what is accepted:
+  #
+  #   - the URL query string, once, when the session starts:
+  #       ?tab=fleet&year=2025&fleet_year=2010&facility=<facility_id>
+  #   - a postMessage from the host page, at any time (app/www/embed.js)
+  #
+  # Every field is optional and checked against what exists — a known tab
+  # name, a year the panel or timeline has, a facility in the register.
+  # Anything else is ignored rather than raising an error: a stale link or a
+  # typo in the host's code must leave a working atlas, not a grey screen.
+  # The full contract is in README.md, "Embedding".
+
+  VIEW_TABS <- c("map", "fleet", "grid", "sources")
+
+  # Every filter back to its interface default (ui.R).
+  reset_filters <- function() {
+    updateCheckboxGroupInput(session, "asset_classes",
+                             selected = names(ASSET_CLASS_LABELS))
+    updateSelectizeInput(session, "sectors", selected = ALL_SECTORS)
+    updateSelectizeInput(session, "provinces", selected = character(0))
+    updateSelectInput(session, "ownership_filter", selected = "all")
+    updateSelectInput(session, "route_filter", selected = "all")
+    updateCheckboxInput(session, "only_captive", value = FALSE)
+  }
+
+  apply_view <- function(p) {
+    # One plain string per field, whatever shape arrived.
+    one <- function(x) {
+      if (is.null(x) || length(x) == 0) return(NA_character_)
+      as.character(unlist(x))[1]
+    }
+    as_year <- function(x) suppressWarnings(as.integer(one(x)))
+
+    tab <- one(p$tab)
+    if (!is.na(tab) && tab %in% VIEW_TABS) updateTabItems(session, "tab", tab)
+
+    yr <- as_year(p$year)
+    if (!is.na(yr) && yr %in% PANEL_YEARS) {
+      updateSliderInput(session, "year", value = yr)
+    }
+
+    fy <- as_year(p$fleet_year)
+    if (!is.na(fy) && fy %in% TIMELINE_YEARS) {
+      updateSliderInput(session, "fleet_year", value = fy)
+    }
+
+    fid <- one(p$facility)
+    if (!is.na(fid) && fid %in% facilities$facility_id) {
+      # A facility the current filters hide would be cleared again at once
+      # (section 4 drops a selection that leaves the filtered set), so the
+      # filters are opened up first.
+      if (!fid %in% selected_facilities()$facility_id) reset_filters()
+      selected_id(fid)
+      f <- facilities[facilities$facility_id == fid, ]
+      updateTabItems(session, "tab", "map")
+      leafletProxy("map") |> setView(lng = f$lon, lat = f$lat, zoom = 9)
+    }
+  }
+
+  # Inbound 1: the query string, once.
+  observeEvent(session$clientData$url_search, {
+    q <- parseQueryString(session$clientData$url_search)
+    if (length(q) > 0) apply_view(q)
+  }, once = TRUE, ignoreNULL = TRUE)
+
+  # Inbound 2: commands from the host page, via embed.js.
+  observeEvent(input$embed_command, apply_view(input$embed_command))
+
+  # Outbound: the view, whenever it changes, so the host can reflect it in its
+  # own URL and build shareable links. Ids rather than labels, so a link
+  # survives a relabelling; the facility name is added for the host's display.
+  observe({
+    fid <- selected_id()
+    session$sendCustomMessage("atlas-state", list(
+      tab        = if (is.null(input$tab)) "map" else input$tab,
+      year       = current_year(),
+      fleet_year = fleet_year(),
+      facility   = if (is.null(fid)) NA_character_ else fid,
+      facility_name = if (is.null(fid)) NA_character_ else
+        facilities$facility_name_tr[facilities$facility_id == fid]
+    ))
+  })
+
+
+  # ===========================================================================
+  # 9. DOWNLOAD — the selection as data
+  # ===========================================================================
+  # What the map shows, as a table: the filtered facilities joined to the
+  # selected year. One click from "I see it" to "I can check it", which is the
+  # audit-trail argument of §8.4 applied to the reader.
+  #
+  # Three choices, each for a reader who will open it somewhere else:
+  #   - UTF-8 with a byte-order mark. Without it Excel on a Turkish Windows
+  #     opens the file as Windows-1254 and the ı, ş, ğ in facility and province
+  #     names turn to mojibake.
+  #   - Comma separator and point decimal — the machine-readable convention.
+  #     Turkish marks are for figures a person reads; a file is read by a
+  #     program, and R, Python and Stata all expect these.
+  #   - The licence notice travels inside the file, as "#" lines above the
+  #     header. The table incorporates CC BY 4.0 databases, so a copy that
+  #     leaves this page must carry the attribution (§10, CC BY §3 and §4).
+  #     read.csv(..., comment.char = "#") and readr's comment = "#" skip them.
+
+  output$download_csv <- downloadHandler(
+    filename = function() {
+      paste0("karbon-atlasi_", current_year(), "_",
+             format(Sys.Date(), "%Y%m%d"), ".csv")
+    },
+    content = function(file) {
+      d <- selected_year_data()
+      out <- data.frame(
+        facility_id          = d$facility_id,
+        facility_name        = d$facility_name_tr,
+        operator             = d$operator_name,
+        asset_class          = d$asset_class,
+        sector               = d$sector,
+        sector_tr            = unname(SECTOR_LABELS[d$sector]),
+        province             = d$province_name_tr,
+        nuts2_code           = d$nuts2_code,
+        lat                  = d$lat,
+        lon                  = d$lon,
+        year                 = rep(current_year(), nrow(d)),
+        value_type           = d$value_type,
+        months_covered       = d$months_covered,
+        gas_basis            = d$gas_basis,
+        emissions_t          = d$emissions_reported_t,
+        production_activity  = d$production_activity,
+        emission_intensity   = d$emission_intensity,
+        confidence_emissions = d$confidence_emissions,
+        commissioning_year   = d$commissioning_year,
+        process_route        = d$process_route,
+        liability_class      = d$liability_class,
+        geocode_quality      = d$geocode_quality,
+        source               = paste("Climate TRACE", d$source_release),
+        stringsAsFactors = FALSE
+      )
+
+      # CSV formula injection. A text cell that begins with = + @ (or a tab or
+      # carriage return) is executed as a formula when the file is opened in
+      # Excel or LibreOffice. Names come from upstream registers, so such a
+      # cell cannot be ruled out; prefixing it with an apostrophe makes the
+      # spreadsheet show it as text. Only character columns are touched — a
+      # numeric column keeps its genuine negative values — and "-" is left
+      # alone for the same reason. No value in the current data is affected.
+      txt <- vapply(out, is.character, logical(1))
+      out[txt] <- lapply(out[txt], function(v)
+        ifelse(!is.na(v) & grepl("^[=+@\t\r]", v), paste0("'", v), v))
+
+      notice <- c(
+        paste0("# Türkiye Karbon Atlası — ", current_year(),
+               if (year_is_projected()) " (KESTİRİM yılı, gözlem değil)" else "",
+               ". İndirildi: ", format(Sys.time(), "%Y-%m-%d %H:%M")),
+        "# Emisyonlar modellenmiş tahmindir, doğrulanmış tesis raporu değildir.",
+        "# İki gaz tabanı toplanmaz: sanayi = CO2, enerji = CO2e (100 yıl). Bkz. gas_basis.",
+        "# Kaynaklar: Climate TRACE (https://climatetrace.org), Global Energy Monitor",
+        "# (https://globalenergymonitor.org) — CC BY 4.0, https://creativecommons.org/licenses/by/4.0/",
+        "# Değiştirilmiştir: Türkiye'ye filtrelendi, yıllığa toplandı, yeniden adlandırıldı,",
+        "# kayıtlar birleştirildi, il ve İBBS-2 koordinatlardan türetildi.",
+        "# Kaynaklar bu çalışmayı onaylamaz; veri garanti olmaksızın sunulur (CC BY 4.0 md. 5).",
+        "# Okurken: read.csv(dosya, comment.char = \"#\")"
+      )
+
+      # The table is written as UTF-8 to a scratch file and copied in as raw
+      # bytes. Routing it through the console (capture.output) would pass it
+      # through the native encoding, which on Windows is not UTF-8.
+      body <- tempfile(fileext = ".csv")
+      on.exit(unlink(body), add = TRUE)
+      utils::write.csv(out, body, row.names = FALSE, na = "",
+                       fileEncoding = "UTF-8")
+
+      con <- file(file, open = "wb")
+      on.exit(close(con), add = TRUE)
+      writeBin(as.raw(c(0xEF, 0xBB, 0xBF)), con)           # UTF-8 BOM
+      writeBin(charToRaw(paste0(paste(enc2utf8(notice), collapse = "\n"), "\n")),
+               con)
+      writeBin(readBin(body, "raw", file.size(body)), con)
+    }
+  )
 }

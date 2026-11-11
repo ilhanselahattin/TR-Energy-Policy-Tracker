@@ -146,6 +146,34 @@ lines <- c(
   "release. Re-running this script with `--force` after an upstream update will",
   "produce a different SHA-256, which is the intended signal that results need",
   "regenerating.",
+  "",
+  # Added 2026-11-11. SOURCES_GEM.md and SOURCES_EMBER.md carried these two
+  # sections from the start; the Climate TRACE notice — the project's PRIMARY
+  # source — did not, which left the licence's modification clause unmet for
+  # the data the whole atlas is built on.
+  "### Modifications — required by CC BY 4.0 §3(1)(a)(ii)",
+  "",
+  "The licence requires stating that the material was modified. It was:",
+  "",
+  "- Filtered to Turkish records (`TUR`) and to the subsectors listed above",
+  "- Monthly records aggregated to calendar years: flows summed, capacity",
+  "  averaged, ratios recomputed from the annual totals (`03_build_panel.R`)",
+  "- Columns renamed to this project's schema; a subset of fields retained",
+  "- Joined to Global Energy Monitor records by name and coordinate proximity",
+  "- Province and İBBS-2 region derived from coordinates against Natural Earth",
+  "",
+  "### Database rights — CC BY 4.0 §4",
+  "",
+  "Climate TRACE's inventory is a database. `data/processed/facilities.rds` and",
+  "`facility_panel.rds` incorporate a substantial portion of it and are Adapted",
+  "Material under §4(2); anyone redistributing them must carry this notice",
+  "forward. The app's CSV download carries it inside the file.",
+  "",
+  "### Disclaimer and endorsement",
+  "",
+  "Provided as-is and as-available, without warranties of any kind (CC BY 4.0",
+  "§5). Climate TRACE does not endorse this project and no endorsement is",
+  "implied (§2(5)(c)).",
   ""
 )
 

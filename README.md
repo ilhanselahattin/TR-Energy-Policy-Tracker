@@ -46,7 +46,14 @@ yoğunluğuna bağlıdır; o yoğunluğu da haritalanabilir bir filo üretir.
 yoğunluğunun üç bağımsız tahmini, **1.800 satırlık tesis × yıl emisyon paneli (2021–2026)**
 ve **zaman slider'lı harita** çalışıyor. **SKDM maruziyet hesabı henüz yok** — gerekli
 mevzuat parametreleri hazır ve kaynaklı, ama dayandıkları modelleme kararları verilmedi.
-2000–2026 filo animasyonu da henüz yok; slider emisyon panelini sürüyor, filoyu değil.
+Filo gelişimi ayrı bir sekmede, kendi slider'ıyla 2000–2026 arasını gösterir.
+
+**Siteye yerleştirme.** Uygulama bir web sayfasına `<iframe>` ile gömülmek üzere
+hazırlandı. Önce `Rscript scripts/06_bundle_app.R` ile veri paketlenir, sonra `app/`
+klasörü yayımlanır. Ev sahibi sayfa, `?tab=…&year=…&facility=…` bağlantıları ve
+`postMessage` komutlarıyla görünümü yönetebilir. Uygulama da yüksekliğini ve o anki
+durumunu sayfaya bildirir. Ayrıntılar aşağıdaki **Deployment** ve **Embedding**
+bölümlerinde.
 
 **Kestirim yılları gözlem gibi çizilmez.** 2025 ve 2026 Climate TRACE'in kestirimidir;
 haritada kesik çizgili ve soluk, grafikte içi boş noktayla gösterilir. 2026 üstelik
@@ -178,10 +185,142 @@ shiny::runApp("app")
 
 ---
 
+## Deployment
+
+Every hosting option publishes the `app/` directory on its own, but inside the repository
+the app reads `data/processed/` and `policies/` from the project root. Bundle first:
+
+```bash
+Rscript scripts/06_bundle_app.R      # writes app/bundle/ (untracked)
+```
+
+This copies all of `data/processed/` and `policies/`, plus `LICENSE` and the
+`SOURCES*.md` attribution files, into `app/bundle/`. It also writes `MANIFEST.json`, which
+records the commit, whether the working tree was clean, and the SHA-256 of every file.
+Published without a project root above it, the app reads the bundle. Inside the
+repository it always reads the live data, so a stale bundle cannot shadow a fresh build.
+Then publish `app/` with whichever route is chosen:
+
+| Route | Command | Notes |
+|---|---|---|
+| shinyapps.io / Posit Connect Cloud | `rsconnect::deployApp("app")` | Fast first load; usage quota on free plans |
+| Shinylive (static, no server) | `shinylive::export("app", "<out>")` | Runs in the browser via webR; 10–30 s first load |
+| Shiny Server (own machine) | copy `app/` to the server's app directory | Full control |
+
+Re-run the bundle after every pipeline run. `tests/testthat/test-bundle.R` fails while
+`app/bundle/` differs from the data it was cut from. It also proves the deployment path:
+it builds a throwaway copy of `app/` with a fresh bundle outside the repository and
+starts the server there.
+
+Redistributing the bundle redistributes CC BY 4.0 Adapted Material. The attribution
+files travel inside it for that reason; keep them there.
+
+---
+
+## Embedding
+
+The atlas is built to sit in an `<iframe>` on a host page (recepresearch.org, "araçlar").
+The host supplies its own interface around it. The two sides talk through
+`window.postMessage` (`app/www/embed.js`, `server.R` section 8). This works across
+origins and needs no cookies.
+
+```html
+<iframe id="atlas" src="https://<app-host>/?tab=map&year=2024"
+        style="width:100%; height:900px; border:0" loading="lazy"
+        title="Türkiye Karbon Atlası"></iframe>
+```
+
+### Opening a specific view — query string
+
+| Parameter | Values | Effect |
+|---|---|---|
+| `tab` | `map`, `fleet`, `grid`, `sources` | opens that tab |
+| `year` | a panel year (2021–2026) | sets the map tab's slider |
+| `fleet_year` | a timeline year (2000–2026) | sets the fleet tab's slider |
+| `facility` | a `facility_id` from `facilities.rds` | selects it, opens the map, zooms to it |
+
+Every value is checked against what exists. An unknown value is ignored, never an error,
+so a stale link still opens a working atlas. Selecting a facility hidden by the current
+filters resets the filters first.
+
+### App → host messages
+
+Every message has `source: "karbon-atlasi"` and `version: 1`.
+
+| `type` | Fields | Use |
+|---|---|---|
+| `ready` | — | the session is connected; commands are accepted from now on |
+| `resize` | `height` (CSS px) | sizes the iframe to its content, sent on every change |
+| `state` | `tab`, `year`, `fleet_year`, `facility`, `facility_name` | reflects the view in the host's own URL for shareable links |
+
+`height` is measured from the page content, not from the document. AdminLTE stretches the
+document to the window, and reporting that height looped: the host grew the iframe, the
+page grew with it, and the next report was taller still. If the iframe is auto-sized, the
+host page scrolls instead of the iframe, and the sticky map no longer sticks. With a fixed
+iframe height the app scrolls inside the frame and the map stays in view. Pick one per
+layout.
+
+### Host → app commands
+
+```js
+document.getElementById("atlas").contentWindow.postMessage(
+  { target: "karbon-atlasi", tab: "fleet", fleet_year: 2010 }, "*");
+document.getElementById("atlas").contentWindow.postMessage(
+  { target: "karbon-atlasi", facility: "CT16560" }, "*");
+```
+
+Fields and validation are the same as the query string. A message is accepted only when
+it comes from the embedding parent and is addressed to `"karbon-atlasi"`.
+
+### A minimal host
+
+```js
+const atlas = document.getElementById("atlas");
+window.addEventListener("message", (e) => {
+  const m = e.data;
+  if (!m || m.source !== "karbon-atlasi") return;
+  if (m.type === "resize") atlas.style.height = m.height + "px";
+  if (m.type === "state") {
+    const q = new URLSearchParams({ tab: m.tab, year: m.year });
+    if (m.facility) q.set("facility", m.facility);
+    history.replaceState(null, "", "?" + q);   // shareable link on the host
+  }
+});
+```
+
+### What the host may restyle, and what it must keep
+
+The look is meant to be replaced: `app/www/atlas.css`, the fonts, and the colour
+constants in `global.R`. The sector colours were measured against a dark basemap; on a
+light basemap they need re-measuring. Three things are functional rather than visual, and
+must survive a restyle:
+
+- `app/www/embed.js`, the contract above.
+- The `tags$style` rules in `ui.R` marked *FUNCTIONAL, NOT THEME*. One makes the
+  place-name layer click-through; without it no facility can be selected, and nothing
+  errors. Another shrinks the maps on phones.
+- The epistemic markings: dashed, desaturated projection years; "modelled estimate"
+  notices; the CC BY notices on the sources tab and inside the CSV download.
+
+The class `atlas-embedded` is set on `<html>` only when framed, as a hook for
+embed-specific styling.
+
+### Download
+
+The map tab's "Seçili veriyi indir (CSV)" button writes the current selection and year.
+The file is UTF-8 with a BOM, so Excel shows Turkish characters correctly. It uses comma
+separators and decimal points. The licence notice sits in `#` lines above the header:
+read the file with `read.csv(f, comment.char = "#")`. Text cells beginning with `= + @`
+are prefixed with `'`, so a spreadsheet cannot execute them as formulas.
+
+---
+
 ## Repository layout
 
 ```
 app/          global.R, ui.R, server.R — the dashboard
+  www/        atlas.css (theme, replaceable), embed.js (host contract, keep)
+  bundle/     deployment snapshot from scripts/06_bundle_app.R (not tracked)
 data/raw/     downloaded sources (not tracked)
 data/processed/  facilities.rds, coverage matrices, SOURCES.md
 policies/     regulatory parameters as JSON, read at runtime

@@ -65,6 +65,11 @@ renv/staging/
 
 # --- Shiny / deployment ----------------------------------------------------
 rsconnect/
+# Deployment bundle written by scripts/06_bundle_app.R: a snapshot of
+# data/processed/ and policies/ so app/ can be published on its own. A build
+# product, reproducible from the pipeline; tracking it would duplicate every
+# data file in history.
+app/bundle/
 
 # --- Secrets ---------------------------------------------------------------
 # API keys for source platforms must never enter history.

@@ -49,12 +49,40 @@ find_project_root <- function(marker = "KARBON_ATLASI.md", max_up = 3) {
     if (identical(parent, path)) break        # reached the filesystem root
     path <- parent
   }
-  stop("Could not locate the project root (no ", marker, " found above ",
-       normalizePath(".", winslash = "/", mustWork = FALSE), ").", call. = FALSE)
+  NULL
 }
 
-PROJECT_ROOT    <- find_project_root()
-FACILITIES_PATH <- file.path(PROJECT_ROOT, "data", "processed", "facilities.rds")
+# WHERE THE DATA LIVES — two layouts, chosen in this order.
+#
+#   1. Development. Inside the repository, data is read from the project root
+#      (data/processed/, policies/), exactly as the pipeline wrote it.
+#   2. Deployed. Hosting services publish the app directory alone —
+#      shinyapps.io and shinylive both bundle only app/ — so nothing above it
+#      exists. scripts/06_bundle_app.R copies everything the app reads into
+#      app/bundle/ with the same layout, and the app reads it from there.
+#
+# The repository wins when both exist, deliberately: a bundle is a snapshot,
+# and a stale one silently replacing freshly built data during development is
+# the failure this order prevents. tests/testthat/test-bundle.R checks that a
+# bundle, when present, still matches the data it was cut from.
+PROJECT_ROOT <- find_project_root()
+DATA_ROOT <- if (!is.null(PROJECT_ROOT)) {
+  PROJECT_ROOT
+} else if (dir.exists("bundle")) {
+  normalizePath("bundle", winslash = "/")
+} else {
+  stop("No data found. Inside the repository, run the pipeline; for a ",
+       "deployment, run `Rscript scripts/06_bundle_app.R` and publish app/ ",
+       "with its bundle/ folder.", call. = FALSE)
+}
+DATA_SOURCE <- if (!is.null(PROJECT_ROOT)) "repository" else "bundle"
+
+# Deployed, an unexpected R error is shown to the visitor as a generic message
+# rather than its text, which can carry server paths. In the repository the
+# full message stays visible, because that is where it is needed.
+if (DATA_SOURCE == "bundle") options(shiny.sanitize.errors = TRUE)
+
+FACILITIES_PATH <- file.path(DATA_ROOT, "data", "processed", "facilities.rds")
 
 if (!file.exists(FACILITIES_PATH)) {
   stop(
@@ -72,16 +100,16 @@ facilities <- readRDS(FACILITIES_PATH)
 # The panel. Required for the time slider; the app still runs without it, with
 # the slider hidden and a notice in its place, so a half-built clone is honest
 # rather than broken.
-PANEL_PATH <- file.path(PROJECT_ROOT, "data", "processed", "facility_panel.rds")
+PANEL_PATH <- file.path(DATA_ROOT, "data", "processed", "facility_panel.rds")
 panel <- if (file.exists(PANEL_PATH)) readRDS(PANEL_PATH) else NULL
 
 # Ownership, from 05. Optional like every other enrichment: the app runs without
 # it and says so rather than failing.
-OWN_SUMMARY_PATH <- file.path(PROJECT_ROOT, "data", "processed",
+OWN_SUMMARY_PATH <- file.path(DATA_ROOT, "data", "processed",
                               "ownership_summary.rds")
-OWN_PATH         <- file.path(PROJECT_ROOT, "data", "processed",
+OWN_PATH         <- file.path(DATA_ROOT, "data", "processed",
                               "ownership.rds")
-OWN_BY_PARENT_PATH <- file.path(PROJECT_ROOT, "data", "processed",
+OWN_BY_PARENT_PATH <- file.path(DATA_ROOT, "data", "processed",
                                 "ownership_by_parent.csv")
 
 ownership_summary <- if (file.exists(OWN_SUMMARY_PATH)) {
@@ -95,7 +123,7 @@ ownership_by_parent <- if (file.exists(OWN_BY_PARENT_PATH)) {
 } else NULL
 
 # TR-ETS threshold check, from 03.
-TR_ETS_PATH <- file.path(PROJECT_ROOT, "data", "processed",
+TR_ETS_PATH <- file.path(DATA_ROOT, "data", "processed",
                          "tr_ets_coverage.csv")
 tr_ets_coverage <- if (file.exists(TR_ETS_PATH)) {
   utils::read.csv(TR_ETS_PATH, fileEncoding = "UTF-8")
@@ -103,7 +131,7 @@ tr_ets_coverage <- if (file.exists(TR_ETS_PATH)) {
 
 # Optional: the grid intensity comparison, if 01d has run. The app degrades
 # rather than failing when it is absent.
-GRID_PATH <- file.path(PROJECT_ROOT, "data", "processed", "grid_intensity.csv")
+GRID_PATH <- file.path(DATA_ROOT, "data", "processed", "grid_intensity.csv")
 grid_intensity <- if (file.exists(GRID_PATH)) {
   utils::read.csv(GRID_PATH, fileEncoding = "UTF-8")
 } else NULL
@@ -234,6 +262,19 @@ GAS_LABELS <- c(
   "co2e_100yr" = "CO₂e (100 yıl)"
 )
 
+# The same labels for base-graphics plots. The PNG device's font has no glyph
+# for the subscript "₂" (U+2082), so GAS_LABELS drew as "CO□" on the series
+# chart — seen on a phone screenshot, 2026-11-11, and present on every screen.
+# Plotmath draws the subscript itself with an ordinary "2", on any device.
+#
+# The axis carries the gas only; "(100 yıl)" ran past the plot's right edge and
+# was cut off. The time horizon is stated in the note under the chart and in
+# GAS_LABELS everywhere else.
+PLOT_GAS_LABELS <- list(
+  "co2"        = quote(CO[2]),
+  "co2e_100yr" = quote(CO[2] * "e")
+)
+
 # value_type is epistemic, not decorative. An observation and a projection must
 # never be rendered identically (§5), so each one carries its own label, colour
 # and marker treatment, defined here once.
@@ -347,6 +388,17 @@ fmt_tr <- function(x, digits = 0) {
 #' asks "is this flag true".
 isTRUE_vec <- function(x) !is.na(x) & x
 
+#' HTML-escape a value from the data before it goes into map popup markup.
+#'
+#' Leaflet escapes LABELS but renders POPUPS as HTML, and popups are assembled
+#' here by pasting facility, operator and plant names from Climate TRACE and
+#' GEM straight into markup. Those names are upstream text, not this project's
+#' code: one already contains "&", and a name containing "<" — or anything a
+#' compromised upstream release put there — would be parsed as markup and run
+#' in every visitor's browser. Escaping costs nothing and closes that path.
+#' Found in the 2026-11-11 security review before public embedding.
+esc <- function(x) htmltools::htmlEscape(as.character(x))
+
 
 # =============================================================================
 # 5. DERIVED CONSTANTS
@@ -421,6 +473,14 @@ ESRI_ATTRIB <- paste0(
 # and the pan limit cannot drift apart.
 MAP_BOUNDS <- list(lng1 = 25.6, lat1 = 35.8, lng2 = 44.8, lat2 = 43.2)
 
+# How far out the map may go. 4, not 5, and with quarter-step zooming: on a
+# phone the map is about 320px wide, and fitting Türkiye's 19 degrees of
+# longitude into that needs zoom ~4.5. With minZoom 5 and whole-number steps the
+# opening view on a phone was the Black Sea and Ukraine, with Türkiye cut off at
+# the bottom edge. Measured in headless Chrome at 390px, 2026-11-06.
+MAP_MIN_ZOOM  <- 4
+MAP_ZOOM_SNAP <- 0.25
+
 
 # =============================================================================
 # 6. FLEET CONTEXT — renewables, if built
@@ -439,16 +499,16 @@ MAP_BOUNDS <- list(lng1 = 25.6, lat1 = 35.8, lng2 = 44.8, lat2 = 43.2)
 # They are the visible answer to ROADMAP E1: Climate TRACE's power register sees
 # 52% of national generation, and this is the half it cannot see.
 
-FLEET_PATH <- file.path(PROJECT_ROOT, "data", "processed", "fleet_renewables.rds")
+FLEET_PATH <- file.path(DATA_ROOT, "data", "processed", "fleet_renewables.rds")
 
 fleet_renewables <- if (file.exists(FLEET_PATH)) readRDS(FLEET_PATH) else NULL
 
 # The 2000–2026 development series, built by 04_build_fleet_timeline.R. Computed
 # in the pipeline rather than here because it is analysis — cumulative capacity
 # with coverage statistics — and the app computes no pipeline step.
-TIMELINE_PATH <- file.path(PROJECT_ROOT, "data", "processed",
+TIMELINE_PATH <- file.path(DATA_ROOT, "data", "processed",
                            "fleet_timeline.csv")
-COVERAGE_PATH <- file.path(PROJECT_ROOT, "data", "processed",
+COVERAGE_PATH <- file.path(DATA_ROOT, "data", "processed",
                            "fleet_timeline_coverage.csv")
 
 fleet_timeline <- if (file.exists(TIMELINE_PATH)) {
@@ -508,7 +568,7 @@ TIMELINE_DEFAULT <- if (length(TIMELINE_YEARS) > 0) max(TIMELINE_YEARS) else NA
 # The renewable build-out of 2015-2024 had already happened before any of this
 # regulation existed.
 
-POLICY_TIMELINE_PATH <- file.path(PROJECT_ROOT, "policies",
+POLICY_TIMELINE_PATH <- file.path(DATA_ROOT, "policies",
                                   "policy_timeline.json")
 
 policy_timeline <- if (file.exists(POLICY_TIMELINE_PATH)) {
@@ -624,7 +684,7 @@ ROUTE_CHOICES <- c(
 # Stops rather than falling back to a remembered number, because a silently
 # stale threshold would misclassify facilities without any visible sign.
 TR_ETS_THRESHOLD_T <- jsonlite::fromJSON(
-  file.path(PROJECT_ROOT, "policies", "tr_ets.json")
+  file.path(DATA_ROOT, "policies", "tr_ets.json")
 )$scope$threshold_tco2e_per_year
 if (!is.numeric(TR_ETS_THRESHOLD_T) || length(TR_ETS_THRESHOLD_T) != 1) {
   stop("policies/tr_ets.json: scope$threshold_tco2e_per_year is missing or ",

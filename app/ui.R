@@ -165,7 +165,13 @@ dashboardPage(
         checkboxInput("flag_uncertain",
                       "Konum ataması belirsiz olanları vurgula", FALSE),
         checkboxInput("only_captive",
-                      "Yalnızca kendi tesisini besleyen santraller", FALSE)
+                      "Yalnızca kendi tesisini besleyen santraller", FALSE),
+
+        tags$hr(),
+
+        # The current selection and year as a CSV, with the licence notice
+        # inside the file (server.R, section 9).
+        downloadButton("download_csv", "Seçili veriyi indir (CSV)")
       )
     )
   ),
@@ -231,8 +237,32 @@ dashboardPage(
       # (server.R, renderLeaflet). Leaflet does not make tile images in a custom
       # pane click-through, so without this rule the label layer swallows every
       # click and no facility can be selected.
-      tags$style(HTML(".leaflet-place_labels-pane { pointer-events: none; }"))
+      tags$style(HTML(".leaflet-place_labels-pane { pointer-events: none; }")),
+
+      # FUNCTIONAL, NOT THEME. On a phone the map is ~320px wide; at a fixed
+      # 640px height the fitted view put Türkiye in the middle of a tall strip
+      # of Ukraine and Belarus, with the country itself below the fold. A
+      # shorter map on narrow screens fits Türkiye with little else. Applied
+      # before Leaflet initialises, so the first fit already uses it.
+      tags$style(HTML(paste(
+        "@media (max-width: 767px) {",
+        "  #map.leaflet, #fleet_map.leaflet { height: 420px !important; }",
+        # The legend covered half the phone map, eastern Türkiye included,
+        # and the tile attribution wrapped to three lines over its bottom.
+        # Both are shrunk, not removed: the legend is how a colour is read,
+        # and the attribution is a licence condition.
+        "  .leaflet .legend { transform: scale(.68); transform-origin: bottom right; }",
+        # Leaflet's own rule is .leaflet-container .leaflet-control-attribution;
+        # a single-class selector loses to it and changed nothing.
+        "  .leaflet-container .leaflet-control-attribution { font-size: 9px; line-height: 1.25; }",
+        "}")))
     ),
+
+    # FUNCTIONAL, NOT THEME — the contract with a host page that embeds the
+    # atlas in an iframe: height and view state out, commands in. Loaded in
+    # the body, after Shiny's own scripts, so its message handler is in place
+    # before the server sends the first state. See README.md, "Embedding".
+    tags$script(src = "embed.js"),
 
     tabItems(
 
