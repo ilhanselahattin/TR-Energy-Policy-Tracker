@@ -237,3 +237,24 @@ test_that("every sector and fleet fuel has a colour and a label", {
     expect_setequal(names(e$FLEET_COLOURS), names(e$FLEET_LABELS))
   }
 })
+
+
+test_that("every sector has a map symbol, and its disc is the sector colour", {
+  # The zoomed-in map draws app/www/icons/<sector>.svg. Those files hard-code
+  # their disc colour, so a change to SECTOR_COLOURS that is not carried into
+  # the SVGs would make the symbols and the dots disagree about a sector.
+  # Asserted rather than trusted, like the atlas.css tokens above.
+  e <- .app_env()
+  for (nm in names(e$SECTOR_COLOURS)) {
+    path <- file.path(ROOT, "app", "www", e$SECTOR_ICONS[[nm]])
+    expect_true(file.exists(path), label = paste("symbol for", nm))
+    svg  <- paste(readLines(path, warn = FALSE), collapse = "")
+    disc <- regmatches(svg, regexpr('<circle[^>]*fill="#[0-9A-Fa-f]{6}"', svg))
+    expect_match(toupper(disc), toupper(e$SECTOR_COLOURS[[nm]]), fixed = TRUE,
+                 label = paste("disc colour of", nm))
+  }
+  # Dots and symbols are shown at disjoint zooms that cover every reachable step.
+  expect_length(intersect(e$ZOOMS_DOTS, e$ZOOMS_ICONS), 0)
+  expect_setequal(c(e$ZOOMS_DOTS, e$ZOOMS_ICONS),
+                  seq(e$MAP_MIN_ZOOM, e$MAP_MAX_ZOOM, by = e$MAP_ZOOM_SNAP))
+})

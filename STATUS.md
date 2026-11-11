@@ -4,7 +4,18 @@
 this file says where it *got to*, what runs, what is blocked, and which traps have already
 been paid for.
 
-Last updated: **2026-11-11** · **~78% complete** · 366 assertions passing
+Last updated: **2026-11-11** · **~78% complete** · 384 assertions passing
+
+> **2026-11-11 (later) — map symbols, and two information defects fixed.** Below zoom 8
+> the map shows dots; from zoom 8 it shows a pictogram per sector (`app/www/icons/`),
+> switched in the browser. Co-located records (10 in the register) are fanned out, so
+> every facility can be clicked; before this, only the top one could be. The selection is
+> ringed on the map, and the legend shows the symbols with register counts and can be
+> folded (8% of the map when open). Defect fixed: every facility was labelled
+> "Climate TRACE v5_9_0", but the 212 energy assets' figures come from v5_10_0. The
+> detail panel, the CSV and the sources tab now use the release per gas basis
+> (`RELEASE_BY_GAS`). Verified in headless Chrome: only dots at ≤7.75 and only
+> symbols at ≥8; clicks on both Tufanbeyli symbols select the right record.
 
 > **2026-11-11 — deployable, and ready to be embedded.** Project-side work only; the
 > host site is a separate job. `scripts/06_bundle_app.R` writes `app/bundle/`, so `app/`

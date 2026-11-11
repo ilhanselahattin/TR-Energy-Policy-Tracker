@@ -260,132 +260,182 @@ function(input, output, session) {
   # names are separate layers, names above the markers (add_place_labels). See
   # ESRI_BASE in global.R for why this is not CartoDB.
   output$map <- renderLeaflet({
-    atlas_map(maxZoom = 14) |>
-      addLegend(
-        position = "bottomright",
-        colors   = unname(SECTOR_COLOURS),
-        labels   = unname(SECTOR_LABELS),
-        title    = "Sektör",
-        opacity  = 0.9
-      )
+    atlas_map(maxZoom = MAP_MAX_ZOOM) |>
+      # The legend shows the symbols a reader meets when zoomed in, with the
+      # register counts, so legend, filter list and map tell one story.
+      addControl(html = SECTOR_LEGEND_HTML, position = "bottomright",
+                 className = "info legend atlas-legend") |>
+      # Dots far out, symbols close in (see "Map symbols" in global.R). The
+      # browser switches between the two groups on its own as the zoom changes;
+      # nothing is sent back to the server.
+      groupOptions("facilities",     zoomLevels = ZOOMS_DOTS) |>
+      groupOptions("facility_icons", zoomLevels = ZOOMS_ICONS)
   })
+
+  # Marker ids. The icon layer uses the facility id itself; the dot layer
+  # prefixes it, because Leaflet keeps ONE layer per id and a second layer with
+  # the same id would silently replace the first. Clicks on either layer select
+  # the same facility (section 4 strips the prefix).
+  DOT_ID_PREFIX <- "d|"
 
   observe({
     df <- selected_year_data()
     yr <- current_year()
 
-    proxy <- leafletProxy("map", data = df) |> clearGroup("facilities")
+    proxy <- leafletProxy("map") |>
+      clearGroup("facilities") |>
+      clearGroup("facility_icons")
 
     if (nrow(df) == 0) return(invisible(NULL))
 
     projected <- year_is_projected()
+    flag      <- isTRUE(input$flag_uncertain)
+    uncertain <- flag & df$geocode_quality != "within_province"
 
-    # Outlines are inverted for the dark basemap. A thin near-black ring
-    # separates overlapping dots without adding brightness; the highlight for an
-    # uncertain geocode is a thick WHITE halo, because on this ground white is
-    # what draws the eye. The previous dark highlight was designed for a light
-    # basemap and would now be invisible against it.
-    stroke_colour <- if (isTRUE(input$flag_uncertain)) {
-      ifelse(df$geocode_quality == "within_province", "#11161A", "#FFFFFF")
-    } else "#11161A"
-
-    stroke_weight <- if (isTRUE(input$flag_uncertain)) {
-      ifelse(df$geocode_quality == "within_province", 1, 3)
-    } else 1
-
-    # AREA scales with emissions, so radius takes the square root. Scaling the
-    # radius directly would make a plant twice as dirty look four times as big,
+    # AREA scales with emissions, so linear size takes the square root. Scaling
+    # it directly would make a plant twice as dirty look four times as big,
     # which is the standard way a bubble map lies.
     #
     # The two populations are scaled SEPARATELY, because their figures are in
     # different gases and a shared scale would invite exactly the comparison
     # §6 forbids. Within each half, area is comparable; across them, only
-    # position is.
-    scaled_radius <- function(v, cls) {
+    # position is. s is 0..1 within its population; NA where no figure exists
+    # for the year, so the facility stays visible without posing as a zero.
+    rel_size <- function(v, cls) {
       out <- rep(NA_real_, length(v))
       for (k in unique(cls)) {
         i <- cls == k
         top <- suppressWarnings(max(v[i], na.rm = TRUE))
-        if (!is.finite(top) || top <= 0) { out[i] <- 4; next }
-        out[i] <- 4 + 11 * sqrt(pmax(v[i], 0) / top)
+        out[i] <- if (!is.finite(top) || top <= 0) 0 else sqrt(pmax(v[i], 0) / top)
       }
-      # A facility with no emissions figure for this year still has to be
-      # visible and must not be mistaken for a zero-emission one.
-      out[is.na(out)] <- 3
       out
     }
+    s <- rel_size(df$emissions_reported_t, df$asset_class)
 
-    radius <- scaled_radius(df$emissions_reported_t, df$asset_class)
+    # Dots stay small: at country scale their job is position and a hint of
+    # size. Symbols get room for the pictogram to read.
+    dot_r  <- ifelse(is.na(s), 2.5, 2.5 + 5.5 * s)
+    icon_w <- ifelse(is.na(s), 16, round(18 + 16 * s))
 
-    # Largest first, so the canvas paints small facilities ON TOP of large ones.
-    # In arbitrary order a 4px plant beside a 15px one in the Marmara or
-    # Ereğli clusters could be painted over entirely and become unclickable.
-    o <- order(radius, decreasing = TRUE)
-    df <- df[o, ]
-    radius <- radius[o]
-    if (length(stroke_colour) > 1) stroke_colour <- stroke_colour[o]
-    if (length(stroke_weight) > 1) stroke_weight <- stroke_weight[o]
+    # Largest first, so small facilities are painted ON TOP of large ones and
+    # stay visible and clickable inside the Marmara and Ereğli clusters.
+    o <- order(dot_r, decreasing = TRUE)
+    df <- df[o, ]; dot_r <- dot_r[o]; icon_w <- icon_w[o]; uncertain <- uncertain[o]
 
-    # A projection is drawn dashed and desaturated. Never identical to an
-    # observation (§5) — colour alone is not enough, so the outline changes too.
-    dash <- if (projected) "3,4" else NULL
-    fill_opacity <- if (projected) 0.45 else 0.85
+    # Records that share a location. Oil and gas fields are listed twice by
+    # Climate TRACE (production and transport) and Tufanbeyli's mine and plant
+    # sit 4 m apart: ten records in all. Drawn exactly on top of each other,
+    # only one could ever be clicked. Symbols are fanned out sideways by a
+    # fixed number of PIXELS (through the icon anchor), so the separation holds
+    # at every zoom; dots stay put and the popup says how many share the spot.
+    loc     <- paste(round(df$lat, 3), round(df$lon, 3))
+    n_here  <- as.integer(ave(seq_along(loc), loc, FUN = length))
+    k_here  <- as.integer(ave(seq_along(loc), loc, FUN = seq_along))
+    # Spaced by the WIDEST symbol at the spot plus a gap. Spacing each symbol
+    # by its own width overlapped a 26px and a 20px symbol at Tufanbeyli, and
+    # a click on the smaller one selected the larger — measured 2026-11-11.
+    w_here  <- as.numeric(ave(icon_w, loc, FUN = max))
+    shift_x <- (k_here - (n_here + 1) / 2) * (w_here + 4)
 
+    # Popup and label, built once and shared by both layers, so the two
+    # drawings can never disagree about a facility.
+    label <- paste0(df$facility_name_tr, " — ",
+                    ifelse(is.na(df$emissions_reported_t), "veri yok",
+                           paste0(fmt_tr(df$emissions_reported_t / 1000, 1), " kt")))
+    popup <- paste0(
+      "<strong>", esc(df$facility_name_tr), "</strong><br/>",
+      "<em>", unname(SECTOR_LABELS[df$sector]), " · ",
+      unname(ASSET_CLASS_LABELS[df$asset_class]), "</em><br/><br/>",
+
+      "<b>", yr, " emisyonu:</b> ",
+      ifelse(is.na(df$emissions_reported_t), "veri yok",
+             paste0(fmt_tr(df$emissions_reported_t / 1000, 1),
+                    " kt ", unname(GAS_LABELS[df$gas_basis]))),
+      ifelse(is.na(df$value_type), "",
+             paste0(" <span style='color:",
+                    ifelse(df$value_type == "projected", "var(--ink-3)", "var(--live)"),
+                    ";'>(", unname(VALUE_TYPE_LABELS[df$value_type]), ")</span>")),
+      "<br/>",
+
+      "<b>Üretim:</b> ",
+      ifelse(is.na(df$production_activity), "yayımlanmıyor",
+             fmt_tr(df$production_activity)),
+      "<br/>",
+      "<b>Yoğunluk:</b> ",
+      ifelse(is.na(df$emission_intensity), "hesaplanamıyor",
+             fmt_tr(df$emission_intensity, 3)),
+      "<br/>",
+      "<b>Güven (emisyon):</b> ",
+      ifelse(is.na(df$confidence_emissions), "—", df$confidence_emissions),
+      "<br/><br/>",
+
+      "<b>İşletmeci:</b> ", ifelse(is.na(df$operator_name), "—", esc(df$operator_name)), "<br/>",
+      "<b>Teknoloji:</b> ", ifelse(is.na(df$technology), "—", esc(df$technology)), "<br/>",
+      "<b>Devreye giriş:</b> ",
+      ifelse(is.na(df$commissioning_year), "bilinmiyor", df$commissioning_year), "<br/>",
+      "<b>İl:</b> ", esc(df$province_name_tr), " (", df$province_code, ")<br/>",
+      "<b>Yükümlülük:</b> ", unname(LIABILITY_SHORT[df$liability_class]), "<br/>",
+      "<b>Kaynak:</b> Climate TRACE ", unname(RELEASE_BY_GAS[df$gas_basis]),
+      ifelse(n_here > 1,
+             paste0("<br/><br/><span style='color:var(--ink-2);'>Bu konumda ",
+                    n_here, " kayıt var. Yakınlaştırınca sembolleri yan yana ",
+                    "gösterilir.</span>"),
+             "")
+    )
+
+    # --- far out: dots ----------------------------------------------------------
+    # Outlines are inverted for the dark basemap: a thin near-black ring
+    # separates overlapping dots; an uncertain geocode gets a thick WHITE halo,
+    # because on this ground white is what draws the eye. A projection is
+    # dashed and desaturated — never identical to an observation (§5).
     proxy |>
       addCircleMarkers(
-        # The re-ordered rows, explicitly: the proxy was created with df in its
-        # original order, and formulas would otherwise resolve against that —
-        # pairing each radius with a different facility.
-        data         = df,
-        lng          = ~lon,
-        lat          = ~lat,
-        layerId      = ~facility_id,
-        group        = "facilities",
-        radius       = radius,
-        fillColor    = ~unname(SECTOR_COLOURS[sector]),
-        fillOpacity  = fill_opacity,
-        color        = stroke_colour,
-        weight       = stroke_weight,
-        dashArray    = dash,
-        label        = ~paste0(facility_name_tr, " — ",
-                               ifelse(is.na(emissions_reported_t), "veri yok",
-                                      paste0(fmt_tr(emissions_reported_t / 1000, 1),
-                                             " kt"))),
-        popup        = ~paste0(
-          "<strong>", esc(facility_name_tr), "</strong><br/>",
-          "<em>", unname(SECTOR_LABELS[sector]), " · ",
-          unname(ASSET_CLASS_LABELS[asset_class]), "</em><br/><br/>",
-
-          "<b>", yr, " emisyonu:</b> ",
-          ifelse(is.na(emissions_reported_t), "veri yok",
-                 paste0(fmt_tr(emissions_reported_t / 1000, 1),
-                        " kt ", unname(GAS_LABELS[gas_basis]))),
-          ifelse(is.na(value_type), "",
-                 paste0(" <span style='color:",
-                        ifelse(value_type == "projected", "var(--ink-3)", "var(--live)"),
-                        ";'>(", unname(VALUE_TYPE_LABELS[value_type]), ")</span>")),
-          "<br/>",
-
-          "<b>Üretim:</b> ",
-          ifelse(is.na(production_activity), "yayımlanmıyor",
-                 fmt_tr(production_activity)),
-          "<br/>",
-          "<b>Yoğunluk:</b> ",
-          ifelse(is.na(emission_intensity), "hesaplanamıyor",
-                 fmt_tr(emission_intensity, 3)),
-          "<br/>",
-          "<b>Güven (emisyon):</b> ",
-          ifelse(is.na(confidence_emissions), "—", confidence_emissions),
-          "<br/><br/>",
-
-          "<b>İşletmeci:</b> ", ifelse(is.na(operator_name), "—", esc(operator_name)), "<br/>",
-          "<b>Teknoloji:</b> ", ifelse(is.na(technology), "—", esc(technology)), "<br/>",
-          "<b>Devreye giriş:</b> ",
-          ifelse(is.na(commissioning_year), "bilinmiyor", commissioning_year), "<br/>",
-          "<b>İl:</b> ", esc(province_name_tr), " (", province_code, ")<br/>",
-          "<b>Yükümlülük:</b> ", unname(LIABILITY_SHORT[liability_class])
-        )
+        lng = df$lon, lat = df$lat,
+        layerId     = paste0(DOT_ID_PREFIX, df$facility_id),
+        group       = "facilities",
+        radius      = dot_r,
+        fillColor   = unname(SECTOR_COLOURS[df$sector]),
+        fillOpacity = if (projected) 0.45 else 0.9,
+        color       = ifelse(uncertain, "#FFFFFF", "#11161A"),
+        weight      = ifelse(uncertain, 2.5, 0.8),
+        dashArray   = if (projected) "2,3" else NULL,
+        label = label, popup = popup
+      ) |>
+      # --- close in: symbols ------------------------------------------------------
+      # Projected years and uncertain geocodes keep their marking here too,
+      # through CSS classes (the FUNCTIONAL block in ui.R): desaturated and
+      # faded for a projection, a white halo for an uncertain location.
+      addMarkers(
+        lng = df$lon, lat = df$lat,
+        layerId = df$facility_id,
+        group   = "facility_icons",
+        icon    = icons(
+          iconUrl     = unname(SECTOR_ICONS[df$sector]),
+          iconWidth   = icon_w, iconHeight = icon_w,
+          iconAnchorX = icon_w / 2 - shift_x, iconAnchorY = icon_w / 2,
+          className   = paste("atlas-ico",
+                              if (projected) "is-projected" else "",
+                              ifelse(uncertain, "is-uncertain", ""))
+        ),
+        label = label, popup = popup
       )
+  })
+
+  # The selected facility, ringed on the map, so the detail panel and the map
+  # always point at the same place — including when the selection came from a
+  # link or from the host page rather than a click. Not interactive: clicks go
+  # through to the facility underneath.
+  observe({
+    fid   <- selected_id()
+    proxy <- leafletProxy("map") |> clearGroup("selection")
+    if (is.null(fid)) return(invisible(NULL))
+    f <- facilities[facilities$facility_id == fid, ]
+    if (nrow(f) != 1) return(invisible(NULL))
+    proxy |>
+      addCircleMarkers(lng = f$lon, lat = f$lat, group = "selection",
+                       radius = 19, fill = FALSE, color = "#FFFFFF",
+                       weight = 2, opacity = 0.95, dashArray = "4,3",
+                       options = pathOptions(interactive = FALSE))
   })
 
 
@@ -576,7 +626,13 @@ function(input, output, session) {
   selected_id <- reactiveVal(NULL)
 
   observeEvent(input$map_marker_click, {
-    selected_id(input$map_marker_click$id)
+    # Dots carry a prefixed id (DOT_ID_PREFIX, section 3); symbols the plain
+    # one. Both select the same facility. Renewable-fleet dots carry no id.
+    id <- input$map_marker_click$id
+    req(!is.null(id))
+    # Plain string test, not a regex: "|" in the prefix is regex alternation.
+    if (startsWith(id, DOT_ID_PREFIX)) id <- substring(id, nchar(DOT_ID_PREFIX) + 1)
+    selected_id(id)
   })
 
   # A facility filtered out of view must not linger in the detail panel.
@@ -620,7 +676,10 @@ function(input, output, session) {
         row("İBBS-2",   paste0(f$nuts2_name_tr, " (", f$nuts2_code, ")")),
         row("Koordinat", sprintf("%.4f, %.4f", f$lat, f$lon)),
         row("Gaz tabanı", GAS_LABELS[[f$gas_basis]]),
-        row("Kaynak",   paste0("Climate TRACE ", f$source_release)),
+        # The release this facility's figures were built from, by gas basis
+        # (RELEASE_BY_GAS in global.R) — not facilities$source_release, which
+        # says v5_9_0 for every record, energy assets included.
+        row("Kaynak",   paste0("Climate TRACE ", RELEASE_BY_GAS[[f$gas_basis]])),
         row("Kaynak ID", f$source_id)
       ),
 
@@ -1661,7 +1720,11 @@ function(input, output, session) {
                "toplandı; sütunlar bu projenin şemasına göre yeniden adlandırıldı; ",
                "Global Energy Monitor kayıtlarıyla birleştirildi; il ve İBBS-2 ",
                "bölgesi koordinatlardan türetildi."),
-        extra = tagList(" Sürüm: ", tags$code(SOURCE_RELEASE), ".")
+        extra = tagList(
+          " Sürüm: ", tags$code(RELEASE_BY_GAS[["co2"]]), " (sanayi, CO₂) ve ",
+          tags$code(RELEASE_BY_GAS[["co2e_100yr"]]), " (enerji, CO₂e). İki gaz ",
+          "paketi aynı gün indirildi ama farklı sürümlerdir; rakamlar ",
+          "karşılaştırılırken bu ayrım taşınmalıdır.")
       ),
 
       attribution(
@@ -1896,7 +1959,7 @@ function(input, output, session) {
         process_route        = d$process_route,
         liability_class      = d$liability_class,
         geocode_quality      = d$geocode_quality,
-        source               = paste("Climate TRACE", d$source_release),
+        source               = paste("Climate TRACE", unname(RELEASE_BY_GAS[d$gas_basis])),
         stringsAsFactors = FALSE
       )
 

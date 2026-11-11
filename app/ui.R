@@ -239,6 +239,32 @@ dashboardPage(
       # click and no facility can be selected.
       tags$style(HTML(".leaflet-place_labels-pane { pointer-events: none; }")),
 
+      # FUNCTIONAL, NOT THEME. The zoomed-in facility symbols (server.R,
+      # section 3) carry the same epistemic marks as the dots: a projected
+      # year is desaturated and faded, never drawn like an observation (§5);
+      # an uncertain geocode gets a white halo when that filter is on. Losing
+      # these in a restyle would make a projection look like a measurement.
+      tags$style(HTML(paste(
+        # No transform here: Leaflet positions markers with transform, and a
+        # hover scale would move the symbol off its location.
+        ".atlas-ico:hover { z-index: 1000 !important; filter: brightness(1.15); }",
+        ".atlas-ico.is-projected { filter: saturate(.25) opacity(.62); }",
+        ".atlas-ico.is-uncertain { filter: drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 1.5px #fff); }",
+        ".atlas-ico.is-projected.is-uncertain { filter: saturate(.25) opacity(.62) drop-shadow(0 0 1.5px #fff); }",
+        # Minimal legend layout; the look is free to restyle.
+        # Compact, and foldable, so it does not cover the map (it took a
+        # quarter of the desktop map at the interface's 13px type).
+        # Selector matches atlas.css's own (.leaflet-bottom .info.legend) plus
+        # one class, so it wins; a single class lost and changed nothing.
+        ".leaflet-bottom .info.legend.atlas-legend { line-height: 1.3; padding: 6px 8px !important; }",
+        ".atlas-legend-title { font-weight: 600; cursor: pointer; }",
+        ".atlas-legend details[open] .atlas-legend-title { margin-bottom: 4px; }",
+        ".atlas-legend-row { display: flex; align-items: center; gap: 5px; white-space: nowrap; }",
+        ".atlas-legend-row img { width: 15px; height: 15px; }",
+        ".atlas-legend-n { opacity: .6; }",
+        ".atlas-legend-note { margin-top: 6px; font-size: 10px; opacity: .7; max-width: 170px; white-space: normal; }"
+      ))),
+
       # FUNCTIONAL, NOT THEME. On a phone the map is ~320px wide; at a fixed
       # 640px height the fitted view put Türkiye in the middle of a tall strip
       # of Ukraine and Belarus, with the country itself below the fold. A

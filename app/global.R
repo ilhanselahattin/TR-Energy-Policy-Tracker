@@ -192,6 +192,30 @@ SECTOR_COLOURS <- c(
   "oil-and-gas-transport"  = "#A78BFA"
 )
 
+# ---- Map symbols ----------------------------------------------------------------
+# Two drawings of the same facilities, chosen by zoom in the browser (no round
+# trip to the server):
+#
+#   zoomed out  — plain dots, small and area-scaled. At country scale three
+#                 hundred pictograms would bury the map they sit on; a dot
+#                 says where and roughly how much, and nothing more is legible
+#                 at that scale anyway.
+#   zoomed in   — a pictogram per sector on a disc of the sector colour, sized
+#                 by emissions, from ICON_MIN_ZOOM. By then the clusters have
+#                 opened up and there is room to say WHAT each facility is.
+#
+# The symbols are static files in app/www/icons/, so the browser caches them
+# once instead of receiving them with every redraw. Their disc colours must
+# equal SECTOR_COLOURS; tests/testthat/test-palette.R reads the SVGs and fails
+# if the two drift apart.
+SECTOR_ICONS <- setNames(paste0("icons/", names(SECTOR_COLOURS), ".svg"),
+                         names(SECTOR_COLOURS))
+
+ICON_MIN_ZOOM <- 8
+# Leaflet shows a group only at zoom levels listed for it, compared exactly, so
+# every quarter step (MAP_ZOOM_SNAP) has to be listed. Defined after the map
+# constants below.
+
 # liability_class is the field the whole merge turns on, so it is shown to the
 # user rather than kept as an internal code.
 LIABILITY_LABELS <- c(
@@ -427,6 +451,17 @@ PROVINCE_CHOICES <- facilities |>
 
 # Data vintage, surfaced in the UI. A figure without a vintage is not auditable.
 SOURCE_RELEASE <- unique(facilities$source_release)[1]
+
+# The release each gas basis was actually built from. They differ: the co2
+# package (industry) is v5_9_0, the co2e_100yr package (energy) v5_10_0 —
+# STATUS.md §4. facilities$source_release says v5_9_0 for all 300 records, so
+# labelling an energy asset's figures with it named the wrong release for 212
+# facilities, in the detail panel, the CSV and the sources tab. Read from the
+# panel, which records the vintage of every row. Found 2026-11-11.
+RELEASE_BY_GAS <- if (!is.null(panel)) {
+  v <- dplyr::distinct(panel, gas_basis, vintage)
+  setNames(v$vintage, v$gas_basis)
+} else c(co2 = SOURCE_RELEASE, co2e_100yr = SOURCE_RELEASE)
 N_FACILITIES   <- nrow(facilities)
 
 # Records and places are different numbers: Climate TRACE lists each oil and gas
@@ -480,6 +515,29 @@ MAP_BOUNDS <- list(lng1 = 25.6, lat1 = 35.8, lng2 = 44.8, lat2 = 43.2)
 # the bottom edge. Measured in headless Chrome at 390px, 2026-11-06.
 MAP_MIN_ZOOM  <- 4
 MAP_ZOOM_SNAP <- 0.25
+MAP_MAX_ZOOM  <- 14
+
+# Which drawing shows at which zoom (see "Map symbols" above). Disjoint and
+# together covering every reachable quarter step, so exactly one is visible.
+ZOOMS_DOTS  <- seq(MAP_MIN_ZOOM, ICON_MIN_ZOOM - MAP_ZOOM_SNAP, by = MAP_ZOOM_SNAP)
+ZOOMS_ICONS <- seq(ICON_MIN_ZOOM, MAP_MAX_ZOOM, by = MAP_ZOOM_SNAP)
+
+# The map legend: the symbol a reader will meet when zoomed in, with its
+# Turkish label and the count in the register, so legend, filter list and
+# map tell one story. Built once, as HTML for a Leaflet control.
+# A <details> element, open by default and folded with one click on "Sektör",
+# so the legend can be put away when it covers part of the map.
+SECTOR_LEGEND_HTML <- paste0(
+  "<details open><summary class='atlas-legend-title'>Sektör</summary>",
+  paste0(
+    "<div class='atlas-legend-row'><img src='", SECTOR_ICONS, "' width='18' ",
+    "height='18' alt=''> ", unname(SECTOR_LABELS[names(SECTOR_ICONS)]),
+    " <span class='atlas-legend-n'>(",
+    as.integer(table(factor(facilities$sector, levels = names(SECTOR_ICONS)))),
+    ")</span></div>",
+    collapse = ""),
+  "<div class='atlas-legend-note'>Uzakta nokta, yakında sembol. ",
+  "Büyüklük emisyonla orantılı.</div></details>")
 
 
 # =============================================================================

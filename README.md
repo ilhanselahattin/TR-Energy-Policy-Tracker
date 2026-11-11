@@ -305,6 +305,18 @@ must survive a restyle:
 The class `atlas-embedded` is set on `<html>` only when framed, as a hook for
 embed-specific styling.
 
+### Map symbols
+
+Below zoom 8 every facility is a small dot whose area scales with emissions. From zoom 8
+up, each facility becomes a sector pictogram (`app/www/icons/<sector>.svg`), still sized
+by emissions. Leaflet switches between the two in the browser, without a server round
+trip. Both drawings share one popup and one label, so they cannot disagree. Records that
+share a location (oil and gas fields listed under both production and transport, and a
+mine and power plant 4 m apart at Tufanbeyli) are fanned out sideways, so each can be
+clicked. The selected facility is ringed. A projected year desaturates the symbols as it
+does the dots. If the sector colours are restyled, the SVG disc colours must follow:
+`test-palette.R` fails when they drift apart.
+
 ### Download
 
 The map tab's "Seçili veriyi indir (CSV)" button writes the current selection and year.
